@@ -1,4 +1,3 @@
-use anyhow::Result;
 use std::env;
 use std::fs::create_dir;
 use std::process::exit;
