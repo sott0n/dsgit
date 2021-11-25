@@ -7,3 +7,5 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.48"
+sha-1 = "0.9.4"
+hex = "0.4.3"
