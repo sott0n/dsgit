@@ -8,17 +8,13 @@ enum Commands {
     Init,
 }
 
-fn arg_parse() -> Result<Commands, String> {
+fn arg_parse() -> Commands {
     for arg in env::args().skip(1) {
-        if arg == "--help" || arg == "-h" {
-            return Ok(Commands::Help);
-        }
-
         if arg == "init" {
-            return Ok(Commands::Init);
+            return Commands::Init;
         }
     }
-    Err(format!("dsgit required commands"))
+    Commands::Help
 }
 
 const DSGIT_DIR: &str = ".dsgit";
@@ -45,7 +41,7 @@ COMMANDS:
 }
 
 fn main() {
-    let cmd = arg_parse().unwrap();
+    let cmd = arg_parse();
     match cmd {
         Commands::Help => help(),
         Commands::Init => init().unwrap(),
