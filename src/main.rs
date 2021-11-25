@@ -1,5 +1,6 @@
 use anyhow::Result;
 use std::env;
+use std::fs::create_dir;
 use std::process::exit;
 
 enum Commands {
@@ -18,6 +19,14 @@ fn arg_parse() -> Result<Commands, String> {
         }
     }
     Err(format!("dsgit required commands"))
+}
+
+const DSGIT_DIR: &str = ".dsgit";
+
+fn init() -> std::io::Result<()> {
+    create_dir(DSGIT_DIR)?;
+    println!("Initialized dsgit");
+    Ok(())
 }
 
 fn help() {
@@ -39,8 +48,6 @@ fn main() {
     let cmd = arg_parse().unwrap();
     match cmd {
         Commands::Help => help(),
-        Commands::Init => println!("Initialized dsgit"),
+        Commands::Init => init().unwrap(),
     }
-
-    println!("Hello, world!");
 }
