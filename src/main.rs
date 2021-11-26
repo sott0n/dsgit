@@ -7,6 +7,7 @@ use std::process::exit;
 enum Commands {
     Help,
     Init,
+    Cat(String),
     HashObject(String),
 }
 
@@ -22,6 +23,11 @@ fn arg_parse() -> Commands {
             let f: String = args[2].to_string();
             return Commands::HashObject(f);
         }
+
+        if args[1] == "cat-file" {
+            let f: String = args[2].to_string();
+            return Commands::Cat(f);
+        }
     }
 
     Commands::Help
@@ -34,7 +40,12 @@ fn init() {
 
 fn hash_object(file: &str) {
     let contents = fs::read_to_string(file).unwrap();
-    data::hash_object(contents.as_bytes()).unwrap();
+    data::hash_object(contents).unwrap();
+}
+
+fn cat_file(file: &str) {
+    let contents = data::get_object(file).unwrap();
+    println!("{}", contents);
 }
 
 fn help() {
@@ -58,6 +69,7 @@ fn main() {
     match cmd {
         Commands::Help => help(),
         Commands::Init => init(),
+        Commands::Cat(file) => cat_file(&file),
         Commands::HashObject(file) => hash_object(&file),
     }
 }
