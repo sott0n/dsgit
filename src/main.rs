@@ -20,12 +20,12 @@ fn arg_parse() -> Commands {
         }
 
         if args[1] == "hash-object" {
-            let f: String = args[2].to_string();
+            let f: String = args[2].to_owned();
             return Commands::HashObject(f);
         }
 
         if args[1] == "cat-file" {
-            let f: String = args[2].to_string();
+            let f: String = args[2].to_owned();
             return Commands::Cat(f);
         }
     }
@@ -40,12 +40,12 @@ fn init() {
 
 fn hash_object(file: &str) {
     let contents = fs::read_to_string(file).unwrap();
-    data::hash_object(contents).unwrap();
+    data::hash_object(&contents).unwrap();
 }
 
 fn cat_file(file: &str) {
     let contents = data::get_object(file).unwrap();
-    println!("{}", contents);
+    print!("{}", contents);
 }
 
 fn help() {

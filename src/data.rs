@@ -18,7 +18,7 @@ pub fn sha1_hash(data: impl AsRef<[u8]>, out: &mut [u8]) {
     out.copy_from_slice(&hasher.finalize())
 }
 
-pub fn hash_object(data: String) -> io::Result<()> {
+pub fn hash_object(data: &str) -> io::Result<()> {
     let mut hash = [0u8; 20];
     sha1_hash(&data.as_bytes(), &mut hash);
     let oid = hex::encode(&hash);
