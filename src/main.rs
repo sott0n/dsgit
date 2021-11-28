@@ -24,7 +24,7 @@ fn arg_parse() -> Commands {
             return Commands::HashObject(f);
         }
 
-        if args[1] == "cat-file" {
+        if args[1] == "cat-object" {
             let f: String = args[2].to_owned();
             return Commands::Cat(f);
         }
@@ -40,11 +40,11 @@ fn init() {
 
 fn hash_object(file: &str) {
     let contents = fs::read_to_string(file).unwrap();
-    data::hash_object(&contents).unwrap();
+    data::hash_object(&contents, data::TypeObject::Blob).unwrap();
 }
 
-fn cat_file(file: &str) {
-    let contents = data::get_object(file).unwrap();
+fn cat_object(file: &str) {
+    let contents = data::get_object(file, data::TypeObject::Blob).unwrap();
     print!("{}", contents);
 }
 
@@ -59,6 +59,7 @@ USAGE:
 COMMANDS:
     init        : Initialize dsgit
     hash-object : Given file, calculate hash object.
+    cat-object  : Given object id, display object's contents.
     --help | -h : Show this help"
     );
     exit(0);
@@ -69,7 +70,7 @@ fn main() {
     match cmd {
         Commands::Help => help(),
         Commands::Init => init(),
-        Commands::Cat(file) => cat_file(&file),
+        Commands::Cat(file) => cat_object(&file),
         Commands::HashObject(file) => hash_object(&file),
     }
 }
