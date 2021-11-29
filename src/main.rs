@@ -1,3 +1,4 @@
+pub mod base;
 pub mod data;
 
 use std::env;
@@ -7,6 +8,7 @@ use std::process::exit;
 enum Commands {
     Help,
     Init,
+    Tree,
     Cat(String),
     HashObject(String),
 }
@@ -28,6 +30,10 @@ fn arg_parse() -> Commands {
             let f: String = args[2].to_owned();
             return Commands::Cat(f);
         }
+
+        if args[1] == "write-tree" {
+            return Commands::Tree;
+        }
     }
 
     Commands::Help
@@ -46,6 +52,11 @@ fn hash_object(file: &str) {
 fn cat_object(file: &str) {
     let contents = data::get_object(file, data::TypeObject::Blob).unwrap();
     print!("{}", contents);
+}
+
+fn write_tree() {
+    let target_path = ".dsgit";
+    let _ = base::write_tree(target_path);
 }
 
 fn help() {
@@ -72,5 +83,6 @@ fn main() {
         Commands::Init => init(),
         Commands::Cat(file) => cat_object(&file),
         Commands::HashObject(file) => hash_object(&file),
+        Commands::Tree => write_tree(),
     }
 }

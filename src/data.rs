@@ -3,16 +3,16 @@ use hex;
 use sha1::{Digest, Sha1};
 use std::fmt;
 use std::fs::{create_dir, File, OpenOptions};
-use std::io;
 use std::io::{Read, Write};
 use std::str;
 use std::str::FromStr;
 
 const DSGIT_DIR: &str = ".dsgit";
 
-pub fn init() -> io::Result<()> {
+pub fn init() -> Result<()> {
     create_dir(DSGIT_DIR)?;
-    create_dir(format!("{}/objects", DSGIT_DIR))?;
+    create_dir(format!("{}/objects", DSGIT_DIR))
+        .with_context(|| format!("Failed to create a directory: {}/objects", DSGIT_DIR))?;
     Ok(())
 }
 
