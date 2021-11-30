@@ -6,6 +6,9 @@ pub fn write_tree(target_path: &str) -> Result<()> {
         .with_context(|| format!("Failed to read directory: {}", target_path))?
     {
         let path = entry.unwrap().path();
+        if is_ignored(&path.to_str().unwrap()) {
+            continue;
+        }
         let metadata = fs::symlink_metadata(&path).unwrap();
 
         if metadata.is_file() {
@@ -18,4 +21,9 @@ pub fn write_tree(target_path: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn is_ignored(path: &str) -> bool {
+    let path = path.to_string();
+    path.contains(".dsgit") || path.contains(".git")
 }

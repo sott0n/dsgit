@@ -55,7 +55,7 @@ fn cat_object(file: &str) {
 }
 
 fn write_tree() {
-    let target_path = ".dsgit";
+    let target_path = ".";
     let _ = base::write_tree(target_path);
 }
 
