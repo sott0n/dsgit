@@ -28,6 +28,7 @@ impl FromStr for TypeObject {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "blob" => Ok(TypeObject::Blob),
+            "tree" => Ok(TypeObject::Tree),
             _ => Err(()),
         }
     }

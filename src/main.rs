@@ -1,6 +1,7 @@
 pub mod base;
 pub mod data;
 
+use anyhow::{anyhow, Result};
 use std::env;
 use std::fs;
 use std::process::exit;
@@ -13,35 +14,39 @@ enum Commands {
     HashObject(String),
 }
 
-fn arg_parse() -> Commands {
+fn arg_parse() -> Result<Commands> {
     let args: Vec<String> = env::args().collect();
 
     if args.len() > 1 {
-        if args[1] == "init" {
-            return Commands::Init;
-        }
-
-        if args[1] == "hash-object" {
-            let f: String = args[2].to_owned();
-            return Commands::HashObject(f);
-        }
-
-        if args[1] == "cat-object" {
-            let f: String = args[2].to_owned();
-            return Commands::Cat(f);
-        }
-
-        if args[1] == "write-tree" {
-            return Commands::Tree;
-        }
+        let cmd: Commands = match args[1].as_str() {
+            "--help" | "-h" => Commands::Help,
+            "init" => Commands::Init,
+            "hash-object" => {
+                let f: String = args[2].to_owned();
+                Commands::HashObject(f)
+            }
+            "cat-object" => {
+                let f: String = args[2].to_owned();
+                Commands::Cat(f)
+            }
+            "write-tree" => Commands::Tree,
+            _ => {
+                return Err(anyhow!(
+                    "tgit: '{}' is not a dsgit command. See 'dsgit --help'.",
+                    args[1]
+                ))
+            }
+        };
+        Ok(cmd)
+    } else {
+        // Not given command pattern.
+        Ok(Commands::Help)
     }
-
-    Commands::Help
 }
 
 fn init() {
     data::init().unwrap();
-    println!("Initialized dsgit");
+    println!("Initialized dsgit with creating '.dsgit'.");
 }
 
 fn hash_object(file: &str) {
@@ -56,7 +61,7 @@ fn cat_object(file: &str) {
 }
 
 fn write_tree() {
-    // TODO Test directory
+    // TODO Test directory, it will be removed in future.
     let target_path = "./tests";
     let oid = base::write_tree(target_path).unwrap();
     println!("{:#}", oid);
@@ -80,8 +85,7 @@ COMMANDS:
 }
 
 fn main() {
-    let cmd = arg_parse();
-    match cmd {
+    match arg_parse().unwrap() {
         Commands::Help => help(),
         Commands::Init => init(),
         Commands::Cat(file) => cat_object(&file),
