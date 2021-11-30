@@ -16,9 +16,10 @@ pub fn init() -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum TypeObject {
     Blob,
+    Tree,
 }
 
 impl FromStr for TypeObject {
@@ -35,7 +36,8 @@ impl FromStr for TypeObject {
 impl fmt::Display for TypeObject {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            TypeObject::Blob => write!(f, "TypeObject::Blob"),
+            TypeObject::Blob => write!(f, "blob"),
+            TypeObject::Tree => write!(f, "tree"),
         }
     }
 }
@@ -46,9 +48,10 @@ pub fn sha1_hash(data: impl AsRef<[u8]>, out: &mut [u8]) {
     out.copy_from_slice(&hasher.finalize())
 }
 
-pub fn hash_object(data: &str, type_obj: TypeObject) -> Result<()> {
+pub fn hash_object(data: &str, type_obj: TypeObject) -> Result<String> {
     let obj = match type_obj {
         TypeObject::Blob => "blob".to_owned() + "\x00" + data,
+        TypeObject::Tree => "tree".to_owned() + "\x00" + data,
     };
 
     let mut hash = [0u8; 20];
@@ -63,7 +66,7 @@ pub fn hash_object(data: &str, type_obj: TypeObject) -> Result<()> {
         .with_context(|| format!("Failed to open object file: objects/{}", oid))?;
 
     file.write_all(obj.as_bytes()).unwrap();
-    Ok(())
+    Ok(oid)
 }
 
 pub fn get_object(oid: &str, expected_type: TypeObject) -> Result<String> {

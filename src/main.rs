@@ -46,7 +46,8 @@ fn init() {
 
 fn hash_object(file: &str) {
     let contents = fs::read_to_string(file).unwrap();
-    data::hash_object(&contents, data::TypeObject::Blob).unwrap();
+    let hash = data::hash_object(&contents, data::TypeObject::Blob).unwrap();
+    println!("{:#}", hash);
 }
 
 fn cat_object(file: &str) {
@@ -55,8 +56,10 @@ fn cat_object(file: &str) {
 }
 
 fn write_tree() {
-    let target_path = ".";
-    let _ = base::write_tree(target_path);
+    // TODO Test directory
+    let target_path = "./tests";
+    let oid = base::write_tree(target_path).unwrap();
+    println!("{:#}", oid);
 }
 
 fn help() {
