@@ -93,3 +93,59 @@ pub fn get_object(oid: &str, expected_type: TypeObject) -> Result<String> {
 
     Ok(objs[1].to_owned())
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use serial_test::serial;
+    use std::assert;
+    use std::fs;
+    use std::path::Path;
+
+    const TEST_DATA: [(&str, &str, &str); 3] = [
+        (
+            "./tests/hello.txt",
+            "4963f4ed0612f7242d9d92bf59b4fb8ac8d29ec2",
+            "Hello World!\n",
+        ),
+        (
+            "./tests/cat.txt",
+            "38d458fa6e384e24e7f15c5d17be0e9cee67f823",
+            "cat cat\n",
+        ),
+        (
+            "./tests/dogs.txt",
+            "bdb10d71fac51e4952b37042faa62640cd7847db",
+            "dog dog dog\n",
+        ),
+    ];
+
+    fn setup() {
+        let _ = fs::remove_dir_all(DSGIT_DIR);
+        let _ = init();
+    }
+
+    #[test]
+    #[serial]
+    fn test_hash_object() {
+        setup();
+        for f in TEST_DATA.iter() {
+            let contents = fs::read_to_string(f.0).unwrap();
+            let hash = hash_object(&contents, TypeObject::Blob).unwrap();
+            assert_eq!(hash, f.1);
+            assert!(Path::new(&format!("{}/objects/{}", DSGIT_DIR, f.1)).exists());
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_get_object() {
+        setup();
+        for f in TEST_DATA.iter() {
+            let contents = fs::read_to_string(f.0).unwrap();
+            let hash = hash_object(&contents, TypeObject::Blob).unwrap();
+            let obj = get_object(&hash, TypeObject::Blob).unwrap();
+            assert_eq!(obj, f.2);
+        }
+    }
+}
