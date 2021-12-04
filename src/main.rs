@@ -6,12 +6,15 @@ use std::env;
 use std::fs;
 use std::process::exit;
 
+const TARGET_PATH: &str = "./tests";
+
 enum Commands {
     Help,
     Init,
-    Tree,
+    WriteTree,
     Cat(String),
     HashObject(String),
+    ReadTree(String),
 }
 
 fn arg_parse() -> Result<Commands> {
@@ -29,7 +32,11 @@ fn arg_parse() -> Result<Commands> {
                 let f: String = args[2].to_owned();
                 Commands::Cat(f)
             }
-            "write-tree" => Commands::Tree,
+            "read-tree" => {
+                let f: String = args[2].to_owned();
+                Commands::ReadTree(f)
+            }
+            "write-tree" => Commands::WriteTree,
             _ => {
                 return Err(anyhow!(
                     "tgit: '{}' is not a dsgit command. See 'dsgit --help'.",
@@ -60,10 +67,12 @@ fn cat_object(file: &str) {
     print!("{}", contents);
 }
 
+fn read_tree(oid: &str) {
+    base::read_tree(oid);
+}
+
 fn write_tree() {
-    // TODO Test directory, it will be removed in future.
-    let target_path = "./tests";
-    let oid = base::write_tree(target_path).unwrap();
+    let oid = base::write_tree(TARGET_PATH).unwrap();
     println!("{:#}", oid);
 }
 
@@ -76,10 +85,12 @@ USAGE:
     dsgit [COMMANDS]
 
 COMMANDS:
-    init        : Initialize dsgit
-    hash-object : Given file, calculate hash object.
-    cat-object  : Given object id, display object's contents.
-    --help | -h : Show this help"
+    init                    : Initialize dsgit
+    hash-object [FILE NAME] : Given file, calculate hash object.
+    cat-object [FILE NAME]  : Given object id, display object's contents.
+    read-tree  [OID]        : Read a tree objects from specified tree oid.
+    write-tree              : Write a tree objects structure into .dsgit.
+    --help | -h             : Show this help"
     );
     exit(0);
 }
@@ -90,6 +101,7 @@ fn main() {
         Commands::Init => init(),
         Commands::Cat(file) => cat_object(&file),
         Commands::HashObject(file) => hash_object(&file),
-        Commands::Tree => write_tree(),
+        Commands::ReadTree(oid) => read_tree(&oid),
+        Commands::WriteTree => write_tree(),
     }
 }
