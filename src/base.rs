@@ -5,6 +5,7 @@ use std::fmt;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::path::Path;
 use std::str::FromStr;
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -46,7 +47,6 @@ pub fn write_tree(target_path: &str, ignore_options: &[String]) -> Result<String
         let path = entry.unwrap().path();
 
         if is_ignored(path.to_str().unwrap(), ignore_options) {
-            println!("{}", &path.display());
             continue;
         }
         let metadata = fs::symlink_metadata(&path).unwrap();
@@ -80,13 +80,35 @@ pub fn write_tree(target_path: &str, ignore_options: &[String]) -> Result<String
     Ok(hash_tree)
 }
 
-pub fn read_tree(oid: &str) {
+fn clear_current_directory(ignore_options: &[String]) {
+    for entry in fs::read_dir(".").unwrap() {
+        let path = entry.unwrap().path();
+        if is_ignored(path.to_str().unwrap(), ignore_options) {
+            continue;
+        }
+        let metadata = fs::symlink_metadata(&path).unwrap();
+
+        if metadata.is_file() {
+            fs::remove_file(&path).unwrap();
+        }
+        if metadata.is_dir() {
+            fs::remove_dir_all(&path).unwrap();
+        }
+    }
+}
+
+pub fn read_tree(oid: &str, ignore_options: &[String]) {
+    clear_current_directory(ignore_options);
     let tree = get_object(oid, TypeObject::Tree).unwrap();
     let entries = &get_tree(&tree).unwrap();
 
     for entry in entries.iter() {
+        let path = Path::new(&entry.path);
+        let prefix = path.parent().unwrap();
+        if !prefix.exists() {
+            fs::create_dir_all(prefix).unwrap();
+        }
         let mut file = OpenOptions::new()
-            .read(true)
             .write(true)
             .create(true)
             .open(&entry.path)
@@ -142,8 +164,6 @@ fn is_ignored(path: &str, ignore_options: &[String]) -> bool {
 
 #[cfg(test)]
 mod test {
-    use crate::read_tree;
-
     use super::*;
     use data::{get_object, init};
     use serial_test::serial;
@@ -155,7 +175,15 @@ mod test {
 
     const DSGIT_DIR: &str = ".dsgit";
     const TARGET_PATH: &str = "./tests";
-    const IGNORE_FILES: [&str; 4] = ["target/", "Cargo.toml", "Cargo.lock", "src/"];
+    const IGNORE_FILES: [&str; 7] = [
+        "target",
+        "Cargo.toml",
+        "Cargo.lock",
+        "src",
+        "LICENSE",
+        "README.md",
+        "Makefile",
+    ];
 
     fn setup() {
         let _ = fs::remove_dir_all(DSGIT_DIR);
@@ -263,7 +291,7 @@ mod test {
             let paths = fs::read_dir("./tests").unwrap();
             assert_eq!(paths.count(), 3);
 
-            read_tree(&oid);
+            read_tree(&oid, ignore_files);
             let paths = fs::read_dir("./tests").unwrap();
             let got_paths = paths
                 .map(|res| res.map(|e| e.path()))

@@ -70,8 +70,8 @@ fn cat_object(file: &str) {
     print!("{}", contents);
 }
 
-fn read_tree(oid: &str) {
-    base::read_tree(oid);
+fn read_tree(oid: &str, ignore_files: Vec<String>) {
+    base::read_tree(oid, &ignore_files);
 }
 
 fn write_tree(ignore_files: Vec<String>) {
@@ -117,7 +117,10 @@ fn main() {
         Commands::Init => init(),
         Commands::Cat(file) => cat_object(&file),
         Commands::HashObject(file) => hash_object(&file),
-        Commands::ReadTree(oid) => read_tree(&oid),
+        Commands::ReadTree(oid) => {
+            let ignore_files = read_ignore_file();
+            read_tree(&oid, ignore_files);
+        }
         Commands::WriteTree => {
             let ignore_files = read_ignore_file();
             write_tree(ignore_files);
