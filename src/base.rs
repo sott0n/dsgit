@@ -7,7 +7,10 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::str::FromStr;
 
-#[derive(Eq, PartialEq, Ord, PartialOrd)]
+// TODO Given from .dsgitignore file
+const IGNORE_OPTIONS: [&str; 1] = ["target"];
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Entry {
     path: String,
     oid: String,
@@ -45,9 +48,7 @@ pub fn write_tree(target_path: &str) -> Result<String> {
     {
         let path = entry.unwrap().path();
 
-        // TODO setting ignore options for rust
-        let ignore_options = vec!["target"];
-        if is_ignored(path.to_str().unwrap(), ignore_options) {
+        if is_ignored(path.to_str().unwrap(), IGNORE_OPTIONS) {
             continue;
         }
         let metadata = fs::symlink_metadata(&path).unwrap();
@@ -123,7 +124,7 @@ fn get_tree(tree: &str) -> Result<Vec<Entry>> {
     Ok(entries)
 }
 
-fn is_ignored(path: &str, ignore_options: Vec<&str>) -> bool {
+fn is_ignored(path: &str, ignore_options: [&str; 1]) -> bool {
     let path = path.to_string();
     if path.contains(".dsgit") || path.contains(".git") {
         return true;
@@ -134,4 +135,98 @@ fn is_ignored(path: &str, ignore_options: Vec<&str>) -> bool {
         }
     }
     false
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use data::{get_object, init};
+    use serial_test::serial;
+    use std::fs;
+
+    const DSGIT_DIR: &str = ".dsgit";
+    const TARGET_PATH: &str = "./tests";
+
+    fn setup() {
+        let _ = fs::remove_dir_all(DSGIT_DIR);
+        let _ = init();
+    }
+
+    fn test_data(target_os: &str) -> [Entry; 4] {
+        match target_os {
+            "windows" => [
+                Entry {
+                    path: "./tests\\cat.txt".to_string(),
+                    oid: "738355a2d1dda0b9f26feb6bb8e2de8f735bcd19".to_string(),
+                    obj_type: TypeObject::Blob,
+                },
+                Entry {
+                    path: "./tests\\dogs.txt".to_string(),
+                    oid: "45ce866627173403d0a0406d7c3f4cb54708ec1c".to_string(),
+                    obj_type: TypeObject::Blob,
+                },
+                Entry {
+                    path: "./tests\\hello.txt".to_string(),
+                    oid: "f0981ab57ce65e2716df953d09c80478fd7dec1c".to_string(),
+                    obj_type: TypeObject::Blob,
+                },
+                Entry {
+                    path: "./tests\\other".to_string(),
+                    oid: "431e2e4cda7956920d1c070ad178a4b348d2c360".to_string(),
+                    obj_type: TypeObject::Tree,
+                },
+            ],
+            // Linux or MacOS
+            _ => [
+                Entry {
+                    path: "./tests/cat.txt".to_string(),
+                    oid: "38d458fa6e384e24e7f15c5d17be0e9cee67f823".to_string(),
+                    obj_type: TypeObject::Blob,
+                },
+                Entry {
+                    path: "./tests/dogs.txt".to_string(),
+                    oid: "bdb10d71fac51e4952b37042faa62640cd7847db".to_string(),
+                    obj_type: TypeObject::Blob,
+                },
+                Entry {
+                    path: "./tests/hello.txt".to_string(),
+                    oid: "4963f4ed0612f7242d9d92bf59b4fb8ac8d29ec2".to_string(),
+                    obj_type: TypeObject::Blob,
+                },
+                Entry {
+                    path: "./tests/other".to_string(),
+                    oid: "0e1ca2a42b0b2934261acd1e9c056b71f7ce405f".to_string(),
+                    obj_type: TypeObject::Tree,
+                },
+            ],
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_write_tree() {
+        setup();
+        if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
+            let expect_result = test_data(""); // Not need spefify os in linux or macos case.
+            let oid = write_tree(TARGET_PATH).unwrap();
+            assert_eq!(oid, "758e8e0c0eae49610531a22c1778e10baece4415");
+
+            let obj = get_object(&oid, TypeObject::Tree).unwrap();
+            for (i, line) in obj.lines().enumerate() {
+                let entry = Entry::from(line);
+                assert_eq!(entry, expect_result[i]);
+            }
+        }
+        if cfg!(target_os = "windows") {
+            let expect_result = test_data("windows");
+            let oid = write_tree(TARGET_PATH).unwrap();
+            assert_eq!(oid, "e64d4dd00d39e3f8f76337cbe3bab51a48d70708");
+
+            let obj = get_object(&oid, TypeObject::Tree).unwrap();
+            for (i, line) in obj.lines().enumerate() {
+                let entry = Entry::from(line);
+                assert_eq!(entry, expect_result[i]);
+            }
+        }
+    }
 }
