@@ -139,10 +139,16 @@ fn is_ignored(path: &str, ignore_options: [&str; 1]) -> bool {
 
 #[cfg(test)]
 mod test {
+    use crate::read_tree;
+
     use super::*;
     use data::{get_object, init};
     use serial_test::serial;
+    use std::collections::HashSet;
     use std::fs;
+    use std::hash::Hash;
+    use std::io;
+    use std::path::PathBuf;
 
     const DSGIT_DIR: &str = ".dsgit";
     const TARGET_PATH: &str = "./tests";
@@ -227,6 +233,52 @@ mod test {
                 let entry = Entry::from(line);
                 assert_eq!(entry, expect_result[i]);
             }
+        }
+    }
+
+    fn assert_list<T>(a: &[T], b: &[T])
+    where
+        T: Eq + Hash,
+    {
+        let a: HashSet<_> = a.iter().collect();
+        let b: HashSet<_> = b.iter().collect();
+
+        assert!(a == b);
+    }
+
+    #[test]
+    #[serial]
+    fn test_read_tree() {
+        fn assert_read_tree(expect_oid: &str, expect_paths: &[PathBuf; 4]) {
+            let oid = write_tree(TARGET_PATH).unwrap();
+            assert_eq!(oid, expect_oid);
+
+            fs::remove_file("./tests/cat.txt").unwrap();
+            let paths = fs::read_dir("./tests").unwrap();
+            assert_eq!(paths.count(), 3);
+
+            read_tree(&oid);
+            let paths = fs::read_dir("./tests").unwrap();
+            let got_paths = paths
+                .map(|res| res.map(|e| e.path()))
+                .collect::<Result<Vec<_>, io::Error>>()
+                .unwrap();
+
+            assert_eq!(&got_paths.len(), &expect_paths.len());
+            assert_list(&got_paths, expect_paths);
+        }
+        let expect_paths = [
+            PathBuf::from("./tests/cat.txt"),
+            PathBuf::from("./tests/dogs.txt"),
+            PathBuf::from("./tests/hello.txt"),
+            PathBuf::from("./tests/other"),
+        ];
+        setup();
+        if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
+            assert_read_tree("758e8e0c0eae49610531a22c1778e10baece4415", &expect_paths);
+        }
+        if cfg!(target_os = "windows") {
+            assert_read_tree("e64d4dd00d39e3f8f76337cbe3bab51a48d70708", &expect_paths);
         }
     }
 }
