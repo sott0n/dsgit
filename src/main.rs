@@ -4,9 +4,8 @@ pub mod data;
 use anyhow::{anyhow, Result};
 use std::env;
 use std::fs;
+use std::path::Path;
 use std::process::exit;
-
-const TARGET_PATH: &str = "./tests";
 
 enum Commands {
     Help,
@@ -53,7 +52,11 @@ fn arg_parse() -> Result<Commands> {
 
 fn init() {
     data::init().unwrap();
-    println!("Initialized dsgit with creating '.dsgit'.");
+    let path = env::current_dir().unwrap();
+    println!(
+        "Initialized empty DSGit repository in {}/.dsgit",
+        path.display()
+    );
 }
 
 fn hash_object(file: &str) {
@@ -71,9 +74,22 @@ fn read_tree(oid: &str) {
     base::read_tree(oid);
 }
 
-fn write_tree() {
-    let oid = base::write_tree(TARGET_PATH).unwrap();
+fn write_tree(ignore_files: Vec<String>) {
+    let oid = base::write_tree(".", &ignore_files).unwrap();
     println!("{:#}", oid);
+}
+
+fn read_ignore_file() -> Vec<String> {
+    let ignore_file_path: &str = ".dsgitignore";
+    let mut ignore_files = vec![];
+
+    if Path::new(ignore_file_path).exists() {
+        let contents = fs::read_to_string(ignore_file_path).unwrap();
+        for file_name in contents.lines() {
+            ignore_files.push(file_name.to_string());
+        }
+    }
+    ignore_files
 }
 
 fn help() {
@@ -102,6 +118,9 @@ fn main() {
         Commands::Cat(file) => cat_object(&file),
         Commands::HashObject(file) => hash_object(&file),
         Commands::ReadTree(oid) => read_tree(&oid),
-        Commands::WriteTree => write_tree(),
+        Commands::WriteTree => {
+            let ignore_files = read_ignore_file();
+            write_tree(ignore_files);
+        }
     }
 }

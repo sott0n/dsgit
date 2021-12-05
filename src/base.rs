@@ -7,9 +7,6 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::str::FromStr;
 
-// TODO Given from .dsgitignore file
-const IGNORE_OPTIONS: [&str; 1] = ["target"];
-
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Entry {
     path: String,
@@ -41,14 +38,15 @@ impl From<&str> for Entry {
     }
 }
 
-pub fn write_tree(target_path: &str) -> Result<String> {
+pub fn write_tree(target_path: &str, ignore_options: &[String]) -> Result<String> {
     let mut entries: Vec<Entry> = vec![];
     for entry in fs::read_dir(target_path)
         .with_context(|| format!("Failed to read directory: {}", target_path))?
     {
         let path = entry.unwrap().path();
 
-        if is_ignored(path.to_str().unwrap(), IGNORE_OPTIONS) {
+        if is_ignored(path.to_str().unwrap(), ignore_options) {
+            println!("{}", &path.display());
             continue;
         }
         let metadata = fs::symlink_metadata(&path).unwrap();
@@ -63,7 +61,7 @@ pub fn write_tree(target_path: &str) -> Result<String> {
             })
         }
         if metadata.is_dir() {
-            let oid = write_tree(path.to_str().unwrap()).unwrap();
+            let oid = write_tree(path.to_str().unwrap(), ignore_options).unwrap();
             entries.push(Entry {
                 path: path.to_str().unwrap().to_string(),
                 oid: oid.to_string(),
@@ -124,9 +122,14 @@ fn get_tree(tree: &str) -> Result<Vec<Entry>> {
     Ok(entries)
 }
 
-fn is_ignored(path: &str, ignore_options: [&str; 1]) -> bool {
+fn is_ignored(path: &str, ignore_options: &[String]) -> bool {
     let path = path.to_string();
-    if path.contains(".dsgit") || path.contains(".git") {
+    if path.contains(".dsgit")
+        || path.contains(".dsgitignore")
+        || path.contains(".git")
+        || path.contains(".gitignore")
+        || path.contains(".github")
+    {
         return true;
     }
     for ignore_path in ignore_options.iter() {
@@ -152,6 +155,7 @@ mod test {
 
     const DSGIT_DIR: &str = ".dsgit";
     const TARGET_PATH: &str = "./tests";
+    const IGNORE_FILES: [&str; 4] = ["target/", "Cargo.toml", "Cargo.lock", "src/"];
 
     fn setup() {
         let _ = fs::remove_dir_all(DSGIT_DIR);
@@ -212,9 +216,10 @@ mod test {
     #[serial]
     fn test_write_tree() {
         setup();
+        let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
         if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
             let expect_result = test_data(""); // Not need spefify os in linux or macos case.
-            let oid = write_tree(TARGET_PATH).unwrap();
+            let oid = write_tree(TARGET_PATH, ignore_files).unwrap();
             assert_eq!(oid, "758e8e0c0eae49610531a22c1778e10baece4415");
 
             let obj = get_object(&oid, TypeObject::Tree).unwrap();
@@ -225,7 +230,7 @@ mod test {
         }
         if cfg!(target_os = "windows") {
             let expect_result = test_data("windows");
-            let oid = write_tree(TARGET_PATH).unwrap();
+            let oid = write_tree(TARGET_PATH, ignore_files).unwrap();
             assert_eq!(oid, "e64d4dd00d39e3f8f76337cbe3bab51a48d70708");
 
             let obj = get_object(&oid, TypeObject::Tree).unwrap();
@@ -250,7 +255,8 @@ mod test {
     #[serial]
     fn test_read_tree() {
         fn assert_read_tree(expect_oid: &str, expect_paths: &[PathBuf; 4]) {
-            let oid = write_tree(TARGET_PATH).unwrap();
+            let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
+            let oid = write_tree(TARGET_PATH, ignore_files).unwrap();
             assert_eq!(oid, expect_oid);
 
             fs::remove_file("./tests/cat.txt").unwrap();
