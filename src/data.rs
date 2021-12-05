@@ -102,21 +102,27 @@ mod test {
     use std::fs;
     use std::path::Path;
 
-    const TEST_DATA: [(&str, &str, &str); 3] = [
+    const TEST_DATA: [(&str, &str, &str, &str, &str); 3] = [
         (
             "./tests/hello.txt",
-            "4963f4ed0612f7242d9d92bf59b4fb8ac8d29ec2",
+            "4963f4ed0612f7242d9d92bf59b4fb8ac8d29ec2", // Linux and MacOS
             "Hello World!\n",
+            "f0981ab57ce65e2716df953d09c80478fd7dec1c", // Windows
+            "Hello World!\r\n",
         ),
         (
             "./tests/cat.txt",
-            "38d458fa6e384e24e7f15c5d17be0e9cee67f823",
+            "38d458fa6e384e24e7f15c5d17be0e9cee67f823", // Linux and MacOS
             "cat cat\n",
+            "738355a2d1dda0b9f26feb6bb8e2de8f735bcd19", // Windows
+            "cat cat\r\n",
         ),
         (
             "./tests/dogs.txt",
-            "bdb10d71fac51e4952b37042faa62640cd7847db",
+            "bdb10d71fac51e4952b37042faa62640cd7847db", // Linux and MacOS
             "dog dog dog\n",
+            "45ce866627173403d0a0406d7c3f4cb54708ec1c", // Windows
+            "dog dog dog\r\n",
         ),
     ];
 
@@ -132,8 +138,15 @@ mod test {
         for f in TEST_DATA.iter() {
             let contents = fs::read_to_string(f.0).unwrap();
             let hash = hash_object(&contents, TypeObject::Blob).unwrap();
-            assert_eq!(hash, f.1);
-            assert!(Path::new(&format!("{}/objects/{}", DSGIT_DIR, f.1)).exists());
+
+            if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
+                assert_eq!(hash, f.1);
+                assert!(Path::new(&format!("{}/objects/{}", DSGIT_DIR, f.1)).exists());
+            }
+            if cfg!(target_os = "windows") {
+                assert_eq!(hash, f.3);
+                assert!(Path::new(&format!("{}/objects/{}", DSGIT_DIR, f.3)).exists());
+            }
         }
     }
 
@@ -145,7 +158,13 @@ mod test {
             let contents = fs::read_to_string(f.0).unwrap();
             let hash = hash_object(&contents, TypeObject::Blob).unwrap();
             let obj = get_object(&hash, TypeObject::Blob).unwrap();
-            assert_eq!(obj, f.2);
+
+            if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
+                assert_eq!(obj, f.2);
+            }
+            if cfg!(target_os = "windows") {
+                assert_eq!(obj, f.4);
+            }
         }
     }
 }
