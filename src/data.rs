@@ -4,6 +4,7 @@ use sha1::{Digest, Sha1};
 use std::fmt;
 use std::fs::{create_dir, File, OpenOptions};
 use std::io::{Read, Write};
+use std::path::Path;
 use std::str;
 use std::str::FromStr;
 
@@ -61,6 +62,22 @@ pub fn set_head(oid: &str) -> Result<&str> {
 
     file.write_all(oid.as_bytes()).unwrap();
     Ok(oid)
+}
+
+pub fn get_head() -> Result<Option<String>> {
+    let file_path = &format!("{}/HEAD", DSGIT_DIR);
+    if Path::new(file_path).is_file() {
+        let mut file = OpenOptions::new()
+            .read(true)
+            .open(file_path)
+            .with_context(|| "Failed to open HEAD file")?;
+
+        let mut buf = String::from("");
+        file.read_to_string(&mut buf)?;
+        Ok(Some(buf))
+    } else {
+        Ok(None)
+    }
 }
 
 pub fn hash_object(data: &str, type_obj: TypeObject) -> Result<String> {

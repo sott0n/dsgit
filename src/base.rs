@@ -164,8 +164,14 @@ fn is_ignored(path: &str, ignore_options: &[String]) -> bool {
 }
 
 pub fn commit(message: &str, ignore_options: &[String]) -> Result<String> {
-    let oid = write_tree(".", ignore_options).unwrap();
-    let commit = String::from("tree ") + &oid + "\n\n" + message + "\n";
+    let oid = write_tree(".", ignore_options)?;
+    let mut commit = String::from("tree ") + &oid + "\n";
+
+    if let Some(head) = data::get_head()? {
+        commit = commit + "parent " + &head + "\n"
+    }
+
+    commit = commit + "\n" + message + "\n";
     let commit_oid = data::hash_object(&commit, data::TypeObject::Commit)?;
     Ok(data::set_head(&commit_oid)?.to_owned())
 }
@@ -329,17 +335,33 @@ mod test {
     fn test_commit() {
         setup();
         let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
-        let got_oid: String = commit("test", &ignore_files).unwrap().to_string();
+
+        // First commit, not include parent hash.
+        let got_first_oid: String = commit("test", &ignore_files).unwrap().to_string();
 
         if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
-            assert_eq!(&got_oid, "7679dce8118ba45c0e0698845d71db172b350852");
+            assert_eq!(&got_first_oid, "7679dce8118ba45c0e0698845d71db172b350852");
         }
         if cfg!(target_os = "windows") {
-            assert_eq!(&got_oid, "aaad0be6d821d5398420eaad5f385892d6727df2");
+            assert_eq!(&got_first_oid, "aaad0be6d821d5398420eaad5f385892d6727df2");
         }
-
-        let obj: String = get_object(&got_oid, data::TypeObject::Commit).unwrap();
+        let obj: String = get_object(&got_first_oid, data::TypeObject::Commit).unwrap();
         let contents: Vec<&str> = obj.lines().collect();
         assert_eq!(contents[2], "test");
+
+        // Second commit, include parent hash.
+        let got_second_oid: String = commit("second commit", &ignore_files).unwrap().to_string();
+
+        if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
+            assert_eq!(&got_second_oid, "6605e946039f5c20e9af1972736a3ecd012fe095");
+        }
+        if cfg!(target_os = "windows") {
+            assert_eq!(&got_second_oid, "36c824b68b40b8c054d9d82c424db2e37ff8c628");
+        }
+        let obj: String = get_object(&got_second_oid, data::TypeObject::Commit).unwrap();
+        let contents: Vec<&str> = obj.lines().collect();
+        assert!(contents[0].contains("tree"));
+        assert!(contents[1].contains("parent"));
+        assert_eq!(contents[3], "second commit");
     }
 }
