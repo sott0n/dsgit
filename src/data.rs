@@ -20,6 +20,7 @@ pub fn init() -> Result<()> {
 pub enum TypeObject {
     Blob,
     Tree,
+    Commit,
 }
 
 impl FromStr for TypeObject {
@@ -29,6 +30,7 @@ impl FromStr for TypeObject {
         match s {
             "blob" => Ok(TypeObject::Blob),
             "tree" => Ok(TypeObject::Tree),
+            "commit" => Ok(TypeObject::Commit),
             _ => Err(()),
         }
     }
@@ -39,6 +41,7 @@ impl fmt::Display for TypeObject {
         match *self {
             TypeObject::Blob => write!(f, "blob"),
             TypeObject::Tree => write!(f, "tree"),
+            TypeObject::Commit => write!(f, "commit"),
         }
     }
 }
@@ -53,6 +56,7 @@ pub fn hash_object(data: &str, type_obj: TypeObject) -> Result<String> {
     let obj = match type_obj {
         TypeObject::Blob => "blob".to_owned() + "\x00" + data,
         TypeObject::Tree => "tree".to_owned() + "\x00" + data,
+        TypeObject::Commit => "commit".to_owned() + "\x00" + data,
     };
 
     let mut hash = [0u8; 20];

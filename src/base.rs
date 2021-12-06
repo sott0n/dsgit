@@ -138,6 +138,7 @@ fn get_tree(tree: &str) -> Result<Vec<Entry>> {
                 let mut tmp_entries = get_tree(&tmp_tree).unwrap();
                 entries.append(&mut tmp_entries);
             }
+            _ => return Err(anyhow!("Unknown tree entry.")),
         }
     }
 
@@ -160,6 +161,12 @@ fn is_ignored(path: &str, ignore_options: &[String]) -> bool {
         }
     }
     false
+}
+
+pub fn commit(message: &str, ignore_options: &[String]) -> Result<String> {
+    let oid = write_tree(".", ignore_options).unwrap();
+    let commit = String::from("tree ") + &oid + "\n\n" + message + "\n";
+    data::hash_object(&commit, data::TypeObject::Commit)
 }
 
 #[cfg(test)]
@@ -314,5 +321,24 @@ mod test {
         if cfg!(target_os = "windows") {
             assert_read_tree("e64d4dd00d39e3f8f76337cbe3bab51a48d70708", &expect_paths);
         }
+    }
+
+    #[test]
+    #[serial]
+    fn test_commit() {
+        setup();
+        let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
+        let got_oid: String = commit("test", &ignore_files).unwrap();
+
+        if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
+            assert_eq!(&got_oid, "7679dce8118ba45c0e0698845d71db172b350852");
+        }
+        if cfg!(target_os = "windows") {
+            assert_eq!(&got_oid, "aaad0be6d821d5398420eaad5f385892d6727df2");
+        }
+
+        let obj: String = get_object(&got_oid, data::TypeObject::Commit).unwrap();
+        let contents: Vec<&str> = obj.lines().collect();
+        assert_eq!(contents[2], "test");
     }
 }

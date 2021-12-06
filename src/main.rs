@@ -14,6 +14,7 @@ enum Commands {
     Cat(String),
     HashObject(String),
     ReadTree(String),
+    Commit(String),
 }
 
 fn arg_parse() -> Result<Commands> {
@@ -36,9 +37,16 @@ fn arg_parse() -> Result<Commands> {
                 Commands::ReadTree(f)
             }
             "write-tree" => Commands::WriteTree,
+            "commit" | "-m" => match args[2].as_str() {
+                "-m" | "--message" => {
+                    let msg: String = args[3].to_owned();
+                    Commands::Commit(msg)
+                }
+                _ => return Err(anyhow!("dsgit: commit required '-m' or '--message'.")),
+            },
             _ => {
                 return Err(anyhow!(
-                    "tgit: '{}' is not a dsgit command. See 'dsgit --help'.",
+                    "dsgit: '{}' is not a dsgit command. See 'dsgit --help'.",
                     args[1]
                 ))
             }
@@ -92,6 +100,11 @@ fn read_ignore_file() -> Vec<String> {
     ignore_files
 }
 
+fn commit(msg: &str, ignore_files: Vec<String>) {
+    let oid = base::commit(msg, &ignore_files).unwrap();
+    println!("{:#}", oid);
+}
+
 fn help() {
     println!(
         "\
@@ -106,6 +119,7 @@ COMMANDS:
     cat-object [FILE NAME]  : Given object id, display object's contents.
     read-tree  [OID]        : Read a tree objects from specified tree oid.
     write-tree              : Write a tree objects structure into .dsgit.
+    commit                  : Commit version.
     --help | -h             : Show this help"
     );
     exit(0);
@@ -124,6 +138,10 @@ fn main() {
         Commands::WriteTree => {
             let ignore_files = read_ignore_file();
             write_tree(ignore_files);
+        }
+        Commands::Commit(msg) => {
+            let ignore_files = read_ignore_file();
+            commit(&msg, ignore_files);
         }
     }
 }
