@@ -166,7 +166,8 @@ fn is_ignored(path: &str, ignore_options: &[String]) -> bool {
 pub fn commit(message: &str, ignore_options: &[String]) -> Result<String> {
     let oid = write_tree(".", ignore_options).unwrap();
     let commit = String::from("tree ") + &oid + "\n\n" + message + "\n";
-    data::hash_object(&commit, data::TypeObject::Commit)
+    let commit_oid = data::hash_object(&commit, data::TypeObject::Commit)?;
+    Ok(data::set_head(&commit_oid)?.to_owned())
 }
 
 #[cfg(test)]
@@ -328,7 +329,7 @@ mod test {
     fn test_commit() {
         setup();
         let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
-        let got_oid: String = commit("test", &ignore_files).unwrap();
+        let got_oid: String = commit("test", &ignore_files).unwrap().to_string();
 
         if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
             assert_eq!(&got_oid, "7679dce8118ba45c0e0698845d71db172b350852");

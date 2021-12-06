@@ -52,6 +52,17 @@ pub fn sha1_hash(data: impl AsRef<[u8]>, out: &mut [u8]) {
     out.copy_from_slice(&hasher.finalize())
 }
 
+pub fn set_head(oid: &str) -> Result<&str> {
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(format!("{}/HEAD", DSGIT_DIR))
+        .with_context(|| "Failed to open object file: objects/head")?;
+
+    file.write_all(oid.as_bytes()).unwrap();
+    Ok(oid)
+}
+
 pub fn hash_object(data: &str, type_obj: TypeObject) -> Result<String> {
     let obj = match type_obj {
         TypeObject::Blob => "blob".to_owned() + "\x00" + data,
