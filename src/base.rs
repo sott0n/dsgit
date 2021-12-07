@@ -134,8 +134,8 @@ fn get_tree(tree: &str) -> Result<Vec<Entry>> {
                 entries.push(entry);
             }
             TypeObject::Tree => {
-                let tmp_tree = get_object(&entry.oid, TypeObject::Tree).unwrap();
-                let mut tmp_entries = get_tree(&tmp_tree).unwrap();
+                let tmp_tree = get_object(&entry.oid, TypeObject::Tree)?;
+                let mut tmp_entries = get_tree(&tmp_tree)?;
                 entries.append(&mut tmp_entries);
             }
             _ => return Err(anyhow!("Unknown tree entry.")),
@@ -161,6 +161,55 @@ fn is_ignored(path: &str, ignore_options: &[String]) -> bool {
         }
     }
     false
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Commit {
+    pub tree: String,
+    pub parent: Option<String>,
+    pub message: String,
+}
+
+impl Commit {
+    pub fn get_commit(oid: &str) -> Result<Self> {
+        let commit_obj = get_object(oid, TypeObject::Commit)?;
+        let lines: Vec<&str> = commit_obj.lines().collect::<Vec<&str>>();
+
+        // Parse each line from below commit format:
+        //   tree [commit hash]
+        //   parent [commit hash] // if first commit, this line is nothing.
+        //
+        //   [commit message]
+        //
+        // Parse a tree line as line0.
+        let line0: Vec<&str> = lines[0].split(' ').collect();
+        let tree = if line0[0] == "tree" {
+            line0[1].to_string()
+        } else {
+            return Err(anyhow!(
+                "Commit object expected including tree object, but got {}",
+                line0[0]
+            ));
+        };
+
+        // Parse a parent line as line0,
+        // this line may None in this case of first commit.
+        let line1: Vec<&str> = lines[1].split(' ').collect();
+        let parent = if line1[0] == "parent" {
+            Some(line1[1].to_string())
+        } else {
+            None
+        };
+
+        // Parse a commit message at last line.
+        let message = String::from("") + lines.last().unwrap();
+
+        Ok(Commit {
+            tree,
+            parent,
+            message,
+        })
+    }
 }
 
 pub fn commit(message: &str, ignore_options: &[String]) -> Result<String> {
@@ -363,5 +412,29 @@ mod test {
         assert!(contents[0].contains("tree"));
         assert!(contents[1].contains("parent"));
         assert_eq!(contents[3], "second commit");
+    }
+
+    #[test]
+    #[serial]
+    fn test_get_commit() {
+        setup();
+        let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
+
+        let oid1 = commit("test", &ignore_files).unwrap().to_string();
+        let oid2 = commit("second commit", &ignore_files).unwrap().to_string();
+
+        let commit1 = Commit::get_commit(&oid1).unwrap();
+        assert!(matches!(commit1, Commit { parent: None, .. }));
+        assert_eq!(commit1.message, "test".to_string());
+
+        let commit2 = Commit::get_commit(&oid2).unwrap();
+        assert!(matches!(
+            commit2,
+            Commit {
+                parent: Some(..),
+                ..
+            }
+        ));
+        assert_eq!(commit2.message, "second commit".to_string());
     }
 }
