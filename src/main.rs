@@ -11,7 +11,7 @@ enum Commands {
     Help,
     Init,
     WriteTree,
-    Log,
+    Log(Option<String>),
     Cat(String),
     HashObject(String),
     ReadTree(String),
@@ -26,7 +26,14 @@ fn arg_parse() -> Result<Commands> {
             "--help" | "-h" => Commands::Help,
             "init" => Commands::Init,
             "write-tree" => Commands::WriteTree,
-            "log" => Commands::Log,
+            "log" => {
+                if args.len() > 2 {
+                    let oid: String = args[2].to_owned();
+                    Commands::Log(Some(oid))
+                } else {
+                    Commands::Log(None)
+                }
+            }
             "cat-object" => {
                 let f: String = args[2].to_owned();
                 Commands::Cat(f)
@@ -69,22 +76,28 @@ fn init() {
     );
 }
 
-fn log() {
-    if let Some(mut oid) = data::get_head().unwrap() {
-        loop {
-            let commit = base::Commit::get_commit(&oid).unwrap();
-            println!("commit {:#}", &oid);
-            println!("tree   {:#}", &commit.tree);
-            if let Some(parent_oid) = &commit.parent {
-                println!("parent {:#}", parent_oid);
-            }
-            println!("\n{:ident$}{:#}", "", &commit.message, ident = 4);
-            println!();
+fn log(hash: Option<String>) {
+    let mut oid = match hash {
+        Some(oid) => oid,
+        None => match data::get_head().unwrap() {
+            Some(oid) => oid,
+            None => return,
+        },
+    };
 
-            oid = match commit.parent {
-                Some(oid) => oid,
-                None => break,
-            }
+    loop {
+        let commit = base::Commit::get_commit(&oid).unwrap();
+        println!("commit {:#}", &oid);
+        println!("tree   {:#}", &commit.tree);
+        if let Some(parent_oid) = &commit.parent {
+            println!("parent {:#}", parent_oid);
+        }
+        println!("\n{:ident$}{:#}", "", &commit.message, ident = 4);
+        println!();
+
+        oid = match commit.parent {
+            Some(oid) => oid,
+            None => break,
         }
     }
 }
@@ -152,7 +165,7 @@ fn main() {
     match arg_parse().unwrap() {
         Commands::Help => help(),
         Commands::Init => init(),
-        Commands::Log => log(),
+        Commands::Log(oid) => log(oid),
         Commands::Cat(file) => cat_object(&file),
         Commands::HashObject(file) => hash_object(&file),
         Commands::ReadTree(oid) => {
