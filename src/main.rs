@@ -16,6 +16,7 @@ enum Commands {
     HashObject(String),
     ReadTree(String),
     Commit(String),
+    Checkout(String),
 }
 
 fn arg_parse() -> Result<Commands> {
@@ -53,6 +54,10 @@ fn arg_parse() -> Result<Commands> {
                 }
                 _ => return Err(anyhow!("dsgit: commit required '-m' or '--message'.")),
             },
+            "checkout" => {
+                let oid: String = args[2].to_owned();
+                Commands::Checkout(oid)
+            }
             _ => {
                 return Err(anyhow!(
                     "dsgit: '{}' is not a dsgit command. See 'dsgit --help'.",
@@ -140,6 +145,10 @@ fn commit(msg: &str, ignore_files: Vec<String>) {
     println!("{:#}", oid);
 }
 
+fn checkout(oid: &str, ignore_files: Vec<String>) {
+    base::checkout(oid, &ignore_files);
+}
+
 fn help() {
     println!(
         "\
@@ -155,7 +164,8 @@ COMMANDS:
     cat-object [FILE NAME]  : Given object id, display object's contents.
     read-tree  [OID]        : Read a tree objects from specified tree oid.
     write-tree              : Write a tree objects structure into .dsgit.
-    commit                  : Commit version.
+    commit                  : Record changes to the repository.
+    checkout                : Switch branch or restore working tree's files.
 "
     );
     exit(0);
@@ -179,6 +189,10 @@ fn main() {
         Commands::Commit(msg) => {
             let ignore_files = read_ignore_file();
             commit(&msg, ignore_files);
+        }
+        Commands::Checkout(oid) => {
+            let ignore_files = read_ignore_file();
+            checkout(&oid, ignore_files);
         }
     }
 }

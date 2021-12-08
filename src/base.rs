@@ -225,6 +225,12 @@ pub fn commit(message: &str, ignore_options: &[String]) -> Result<String> {
     Ok(data::set_head(&commit_oid)?.to_owned())
 }
 
+pub fn checkout(oid: &str, ignore_options: &[String]) {
+    let commit = Commit::get_commit(oid).unwrap();
+    read_tree(&commit.tree, ignore_options);
+    let _ = data::set_head(oid);
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -436,5 +442,32 @@ mod test {
             }
         ));
         assert_eq!(commit2.message, "second commit".to_string());
+    }
+
+    #[test]
+    #[serial]
+    fn test_checkout() {
+        fn assert_number_files(path: &str, expected: usize) {
+            let files = fs::read_dir(path)
+                .unwrap()
+                .map(|res| res.map(|e| e.path()))
+                .collect::<Result<Vec<_>, io::Error>>()
+                .unwrap();
+            assert_eq!(files.len(), expected);
+        }
+        setup();
+        let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
+
+        let oid1 = commit("1st commit", &ignore_files).unwrap();
+        assert_number_files("./tests", 4);
+
+        // Create a new file.
+        fs::write("./tests/foo.txt", "foo bar").unwrap();
+        commit("2nd commit", &ignore_files).unwrap();
+        assert_number_files("./tests", 5);
+
+        // Checkout `1st commit` hash.
+        checkout(&oid1, &ignore_files);
+        assert_number_files("./tests", 4);
     }
 }
