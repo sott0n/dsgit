@@ -17,6 +17,7 @@ enum Commands {
     ReadTree(String),
     Commit(String),
     Checkout(String),
+    Tag((String, Option<String>)),
 }
 
 fn arg_parse() -> Result<Commands> {
@@ -58,6 +59,21 @@ fn arg_parse() -> Result<Commands> {
                 let oid: String = args[2].to_owned();
                 Commands::Checkout(oid)
             }
+            "tag" => {
+                if args.len() < 3 {
+                    return Err(anyhow!(
+                        "dsgit: tag required tag-name, and (option) commit-hash."
+                    ));
+                } else {
+                    let tag: String = args[2].to_owned();
+                    if args.len() == 3 {
+                        Commands::Tag((tag, None))
+                    } else {
+                        let uid: String = args[3].to_owned();
+                        Commands::Tag((tag, Some(uid)))
+                    }
+                }
+            }
             _ => {
                 return Err(anyhow!(
                     "dsgit: '{}' is not a dsgit command. See 'dsgit --help'.",
@@ -84,7 +100,7 @@ fn init() {
 fn log(hash: Option<String>) {
     let mut oid = match hash {
         Some(oid) => oid,
-        None => match data::get_head().unwrap() {
+        None => match data::get_ref("HEAD").unwrap() {
             Some(oid) => oid,
             None => return,
         },
@@ -149,6 +165,10 @@ fn checkout(oid: &str, ignore_files: Vec<String>) {
     base::checkout(oid, &ignore_files);
 }
 
+fn create_tag(tag: &str, oid: &str) {
+    base::create_tag(tag, oid);
+}
+
 fn help() {
     println!(
         "\
@@ -166,6 +186,7 @@ COMMANDS:
     write-tree              : Write a tree objects structure into .dsgit.
     commit                  : Record changes to the repository.
     checkout                : Switch branch or restore working tree's files.
+    tag                     : Set a mark to commit hash.
 "
     );
     exit(0);
@@ -193,6 +214,13 @@ fn main() {
         Commands::Checkout(oid) => {
             let ignore_files = read_ignore_file();
             checkout(&oid, ignore_files);
+        }
+        Commands::Tag((tag, oid_or_none)) => {
+            let oid = match oid_or_none {
+                Some(oid) => oid,
+                None => data::get_ref("HEAD").unwrap().unwrap(),
+            };
+            create_tag(&tag, &oid);
         }
     }
 }

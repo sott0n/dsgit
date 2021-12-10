@@ -216,19 +216,23 @@ pub fn commit(message: &str, ignore_options: &[String]) -> Result<String> {
     let oid = write_tree(".", ignore_options)?;
     let mut commit = String::from("tree ") + &oid + "\n";
 
-    if let Some(head) = data::get_head()? {
+    if let Some(head) = data::get_ref("HEAD")? {
         commit = commit + "parent " + &head + "\n"
     }
 
     commit = commit + "\n" + message + "\n";
     let commit_oid = data::hash_object(&commit, data::TypeObject::Commit)?;
-    Ok(data::set_head(&commit_oid)?.to_owned())
+    Ok(data::update_ref("HEAD", &commit_oid)?.to_owned())
 }
 
 pub fn checkout(oid: &str, ignore_options: &[String]) {
     let commit = Commit::get_commit(oid).unwrap();
     read_tree(&commit.tree, ignore_options);
-    let _ = data::set_head(oid);
+    let _ = data::update_ref("HEAD", oid);
+}
+
+pub fn create_tag(tag: &str, oid: &str) {
+    let _ = data::update_ref(&format!("refs/tags/{}", tag), oid);
 }
 
 #[cfg(test)]
@@ -240,6 +244,7 @@ mod test {
     use std::fs;
     use std::hash::Hash;
     use std::io;
+    use std::io::BufRead;
     use std::path::PathBuf;
 
     const DSGIT_DIR: &str = ".dsgit";
@@ -469,5 +474,32 @@ mod test {
         // Checkout `1st commit` hash.
         checkout(&oid1, &ignore_files);
         assert_number_files("./tests", 4);
+    }
+
+    fn assert_file_contents(path: &str, expects: Vec<String>) {
+        let f1 = fs::File::open(path).unwrap();
+        let f1_contents = io::BufReader::new(f1);
+        for (got, expect) in f1_contents.lines().zip(expects) {
+            assert_eq!(got.unwrap(), expect);
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_create_tag() {
+        setup();
+        let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
+        let oid1 = commit("1st commit", &ignore_files).unwrap();
+        let oid2 = commit("2nd commit", &ignore_files).unwrap();
+
+        create_tag("tag1", &oid1);
+        let f1_path = format!("{}/refs/tags/tag1", DSGIT_DIR);
+        assert!(Path::new(&f1_path).exists());
+        assert_file_contents(&f1_path, vec![oid1]);
+
+        create_tag("tag2", &oid2);
+        let f2_path = format!("{}/refs/tags/tag2", DSGIT_DIR);
+        assert!(Path::new(&f2_path).exists());
+        assert_file_contents(&f2_path, vec![oid2]);
     }
 }

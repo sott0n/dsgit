@@ -1,12 +1,12 @@
 use anyhow::{anyhow, Context, Result};
 use hex;
 use sha1::{Digest, Sha1};
-use std::fmt;
 use std::fs::{create_dir, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::str;
 use std::str::FromStr;
+use std::{fmt, fs};
 
 const DSGIT_DIR: &str = ".dsgit";
 
@@ -53,23 +53,27 @@ pub fn sha1_hash(data: impl AsRef<[u8]>, out: &mut [u8]) {
     out.copy_from_slice(&hasher.finalize())
 }
 
-pub fn set_head(oid: &str) -> Result<&str> {
+pub fn update_ref<'a>(refs: &'a str, oid: &'a str) -> Result<&'a str> {
+    let ref_path: String = format!("{}/{}", DSGIT_DIR, refs);
+    let parent_path = Path::new(&ref_path).parent().unwrap();
+
+    fs::create_dir_all(parent_path)?;
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
-        .open(format!("{}/HEAD", DSGIT_DIR))
-        .with_context(|| "Failed to open object file: objects/head")?;
+        .open(&ref_path)
+        .with_context(|| format!("Failed to open object file: {}", ref_path))?;
 
     file.write_all(oid.as_bytes()).unwrap();
     Ok(oid)
 }
 
-pub fn get_head() -> Result<Option<String>> {
-    let file_path = &format!("{}/HEAD", DSGIT_DIR);
-    if Path::new(file_path).is_file() {
+pub fn get_ref(refs: &str) -> Result<Option<String>> {
+    let ref_path = &format!("{}/{}", DSGIT_DIR, refs);
+    if Path::new(ref_path).is_file() {
         let mut file = OpenOptions::new()
             .read(true)
-            .open(file_path)
+            .open(ref_path)
             .with_context(|| "Failed to open HEAD file")?;
 
         let mut buf = String::from("");
