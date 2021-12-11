@@ -235,6 +235,14 @@ pub fn create_tag(tag: &str, oid: &str) {
     let _ = data::update_ref(&format!("refs/tags/{}", tag), oid);
 }
 
+pub fn get_oid(name: &str) -> Result<String> {
+    let oid = match data::get_ref(name)? {
+        Some(oid) => oid,
+        None => name.to_owned(),
+    };
+    Ok(oid)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

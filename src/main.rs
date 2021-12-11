@@ -69,8 +69,8 @@ fn arg_parse() -> Result<Commands> {
                     if args.len() == 3 {
                         Commands::Tag((tag, None))
                     } else {
-                        let uid: String = args[3].to_owned();
-                        Commands::Tag((tag, Some(uid)))
+                        let oid: String = args[3].to_owned();
+                        Commands::Tag((tag, Some(oid)))
                     }
                 }
             }
@@ -97,9 +97,9 @@ fn init() {
     );
 }
 
-fn log(hash: Option<String>) {
-    let mut oid = match hash {
-        Some(oid) => oid,
+fn log(tag_or_oid: Option<String>) {
+    let mut oid = match tag_or_oid {
+        Some(tag_or_oid) => base::get_oid(&tag_or_oid).unwrap(),
         None => match data::get_ref("HEAD").unwrap() {
             Some(oid) => oid,
             None => return,
@@ -129,13 +129,15 @@ fn hash_object(file: &str) {
     println!("{:#}", hash);
 }
 
-fn cat_object(file: &str) {
-    let contents = data::get_object(file, data::TypeObject::Blob).unwrap();
+fn cat_object(tag_or_oid: &str) {
+    let oid = base::get_oid(tag_or_oid).unwrap();
+    let contents = data::get_object(&oid, data::TypeObject::Blob).unwrap();
     print!("{}", contents);
 }
 
-fn read_tree(oid: &str, ignore_files: Vec<String>) {
-    base::read_tree(oid, &ignore_files);
+fn read_tree(tag_or_oid: &str, ignore_files: Vec<String>) {
+    let oid = base::get_oid(tag_or_oid).unwrap();
+    base::read_tree(&oid, &ignore_files);
 }
 
 fn write_tree(ignore_files: Vec<String>) {
@@ -161,12 +163,14 @@ fn commit(msg: &str, ignore_files: Vec<String>) {
     println!("{:#}", oid);
 }
 
-fn checkout(oid: &str, ignore_files: Vec<String>) {
-    base::checkout(oid, &ignore_files);
+fn checkout(tag_or_oid: &str, ignore_files: Vec<String>) {
+    let oid = base::get_oid(tag_or_oid).unwrap();
+    base::checkout(&oid, &ignore_files);
 }
 
-fn create_tag(tag: &str, oid: &str) {
-    base::create_tag(tag, oid);
+fn create_tag(tag: &str, tag_or_oid: &str) {
+    let oid = base::get_oid(tag_or_oid).unwrap();
+    base::create_tag(tag, &oid);
 }
 
 fn help() {
