@@ -236,11 +236,33 @@ pub fn create_tag(tag: &str, oid: &str) {
 }
 
 pub fn get_oid(name: &str) -> Result<String> {
-    let oid = match data::get_ref(name)? {
-        Some(oid) => oid,
-        None => name.to_owned(),
-    };
-    Ok(oid)
+    let refs_walk = [
+        name.to_string(),
+        format!("refs/{}", name),
+        format!("refs/tags/{}", name),
+        format!("refs/heads/{}", name),
+    ];
+    for path in refs_walk.iter() {
+        match data::get_ref(path)? {
+            Some(oid) => return Ok(oid),
+            None => continue,
+        };
+    }
+
+    // Check a given name is hash value.
+    let is_hex = name
+        .chars()
+        .collect::<Vec<char>>()
+        .iter()
+        .all(|c| c.is_ascii_hexdigit());
+    if name.len() == 40 && is_hex {
+        return Ok(name.to_string());
+    }
+
+    Err(anyhow!(format!(
+        "Unknown name and not hash value: {}",
+        name
+    )))
 }
 
 #[cfg(test)]
