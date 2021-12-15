@@ -197,22 +197,22 @@ fn branch(name: &str, oid: &str) {
 fn help() {
     println!(
         "\
-dsgit: Version management system for dataset written in Rust.
+dsgit: A toy version management system written in Rust.
 
 USAGE:
     dsgit [COMMANDS]
 
 COMMANDS:
-    --help | -h             : Show this help
-    init                    : Initialize dsgit
-    hash-object [FILE NAME] : Given file, calculate hash object.
-    cat-object [FILE NAME]  : Given object id, display object's contents.
-    read-tree  [OID]        : Read a tree objects from specified tree oid.
-    write-tree              : Write a tree objects structure into .dsgit.
-    commit                  : Record changes to the repository.
-    checkout                : Switch branch or restore working tree's files.
-    tag                     : Set a mark to commit hash.
-    branch                  : Diverge from the main line of development and \
+    --help | -h                : Show this help.
+    init                       : Initialize dsgit, creating `.dsgit` directory.
+    hash-object [FILE NAME]    : Given file, calculate hash object.
+    cat-object [FILE NAME]     : Given object id, display object's contents.
+    read-tree [OID]            : Read a tree objects from specified tree oid.
+    write-tree                 : Write a tree objects structure into .dsgit.
+    commit [MESSAGE]           : Record changes to the repository.
+    checkout [OID]             : Switch branch or restore working tree's files.
+    tag [TAG NAME] [OID]       : Set a mark to commit hash.
+    branch [BRANCH NAME] [OID] : Diverge from the main line of development and \
 continue to do work without messing with that main line.
 "
     );
