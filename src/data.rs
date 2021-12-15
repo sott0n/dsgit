@@ -74,10 +74,15 @@ pub fn get_ref(refs: &str) -> Result<Option<String>> {
         let mut file = OpenOptions::new()
             .read(true)
             .open(ref_path)
-            .with_context(|| "Failed to open HEAD file")?;
+            .with_context(|| format!("Failed to open file: {}", ref_path))?;
 
         let mut buf = String::from("");
         file.read_to_string(&mut buf)?;
+
+        if buf.starts_with("ref:") {
+            let ref_path: Vec<&str> = buf.split(':').collect();
+            return get_ref(ref_path[1]);
+        }
         Ok(Some(buf))
     } else {
         Ok(None)
