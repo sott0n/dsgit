@@ -265,6 +265,11 @@ pub fn get_oid(name: &str) -> Result<String> {
     )))
 }
 
+pub fn create_branch(name: &str, oid: &str) {
+    let ref_name = String::from("refs/heads/") + name;
+    let _ = data::update_ref(&ref_name, oid);
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -531,5 +536,24 @@ mod test {
         let f2_path = format!("{}/refs/tags/tag2", DSGIT_DIR);
         assert!(Path::new(&f2_path).exists());
         assert_file_contents(&f2_path, vec![oid2]);
+    }
+
+    #[test]
+    #[serial]
+    fn test_create_branch() {
+        setup();
+        let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
+        let oid1 = commit("1st commit", &ignore_files).unwrap();
+        let oid2 = commit("2nd commit", &ignore_files).unwrap();
+
+        create_branch("branch1", &oid1);
+        let b1_path = format!("{}/refs/heads/branch1", DSGIT_DIR);
+        assert!(Path::new(&b1_path).exists());
+        assert_file_contents(&b1_path, vec![oid1]);
+
+        create_branch("branch2", &oid2);
+        let b2_path = format!("{}/refs/heads/branch2", DSGIT_DIR);
+        assert!(Path::new(&b2_path).exists());
+        assert_file_contents(&b2_path, vec![oid2]);
     }
 }

@@ -18,6 +18,7 @@ enum Commands {
     Commit(String),
     Checkout(String),
     Tag((String, Option<String>)),
+    Branch((String, Option<String>)),
 }
 
 fn arg_parse() -> Result<Commands> {
@@ -55,6 +56,21 @@ fn arg_parse() -> Result<Commands> {
                 }
                 _ => return Err(anyhow!("dsgit: commit required '-m' or '--message'.")),
             },
+            "branch" => {
+                if args.len() < 3 {
+                    return Err(anyhow!(
+                        "dsgit: branch required branch-name, and (option) commit-hash."
+                    ));
+                } else {
+                    let branch_name: String = args[2].to_owned();
+                    if args.len() == 3 {
+                        Commands::Branch((branch_name, None))
+                    } else {
+                        let oid: String = args[3].to_owned();
+                        Commands::Branch((branch_name, Some(oid)))
+                    }
+                }
+            }
             "checkout" => {
                 let oid: String = args[2].to_owned();
                 Commands::Checkout(oid)
@@ -173,6 +189,11 @@ fn create_tag(tag: &str, tag_or_oid: &str) {
     base::create_tag(tag, &oid);
 }
 
+fn branch(name: &str, oid: &str) {
+    base::create_branch(name, oid);
+    println!("Created a branch: {} at {}", name, oid);
+}
+
 fn help() {
     println!(
         "\
@@ -191,6 +212,8 @@ COMMANDS:
     commit                  : Record changes to the repository.
     checkout                : Switch branch or restore working tree's files.
     tag                     : Set a mark to commit hash.
+    branch                  : Diverge from the main line of development and \
+continue to do work without messing with that main line.
 "
     );
     exit(0);
@@ -225,6 +248,13 @@ fn main() {
                 None => data::get_ref("HEAD").unwrap().unwrap(),
             };
             create_tag(&tag, &oid);
+        }
+        Commands::Branch((name, oid_or_none)) => {
+            let oid = match oid_or_none {
+                Some(oid) => oid,
+                None => data::get_ref("HEAD").unwrap().unwrap(),
+            };
+            branch(&name, &oid);
         }
     }
 }
