@@ -153,11 +153,11 @@ fn cat_object(tag_or_oid: &str) {
 
 fn read_tree(tag_or_oid: &str, ignore_files: Vec<String>) {
     let oid = base::get_oid(tag_or_oid).unwrap();
-    base::read_tree(&oid, &ignore_files);
+    base::Tree::read_tree(&oid, &ignore_files);
 }
 
 fn write_tree(ignore_files: Vec<String>) {
-    let oid = base::write_tree(".", &ignore_files).unwrap();
+    let oid = base::Tree::write_tree(".", &ignore_files).unwrap();
     println!("{:#}", oid);
 }
 
@@ -175,7 +175,7 @@ fn read_ignore_file() -> Vec<String> {
 }
 
 fn commit(msg: &str, ignore_files: Vec<String>) {
-    let oid = base::commit(msg, &ignore_files).unwrap();
+    let oid = base::Commit::commit(msg, &ignore_files).unwrap();
     println!("{:#}", oid);
 }
 

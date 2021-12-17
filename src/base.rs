@@ -39,128 +39,134 @@ impl From<&str> for Entry {
     }
 }
 
-pub fn write_tree(target_path: &str, ignore_options: &[String]) -> Result<String> {
-    let mut entries: Vec<Entry> = vec![];
-    for entry in fs::read_dir(target_path)
-        .with_context(|| format!("Failed to read directory: {}", target_path))?
-    {
-        let path = entry.unwrap().path();
-
-        if is_ignored(path.to_str().unwrap(), ignore_options) {
-            continue;
-        }
-        let metadata = fs::symlink_metadata(&path).unwrap();
-
-        if metadata.is_file() {
-            let contents = fs::read_to_string(&path).unwrap();
-            let oid = hash_object(&contents, TypeObject::Blob).unwrap();
-            entries.push(Entry {
-                path: path.to_str().unwrap().to_string(),
-                oid: oid.to_string(),
-                obj_type: TypeObject::Blob,
-            })
-        }
-        if metadata.is_dir() {
-            let oid = write_tree(path.to_str().unwrap(), ignore_options).unwrap();
-            entries.push(Entry {
-                path: path.to_str().unwrap().to_string(),
-                oid: oid.to_string(),
-                obj_type: TypeObject::Tree,
-            })
-        }
-    }
-
-    let mut tree = String::new();
-    entries.sort();
-    for entry in entries.iter() {
-        tree = tree + &entry.to_string();
-    }
-
-    let hash_tree = hash_object(&tree, TypeObject::Tree).unwrap();
-    Ok(hash_tree)
+#[derive(Debug)]
+pub struct Tree {
+    tree: Vec<Entry>,
 }
 
-fn clear_current_directory(ignore_options: &[String]) {
-    for entry in fs::read_dir(".").unwrap() {
-        let path = entry.unwrap().path();
-        if is_ignored(path.to_str().unwrap(), ignore_options) {
-            continue;
-        }
-        let metadata = fs::symlink_metadata(&path).unwrap();
+impl Tree {
+    pub fn write_tree(target_path: &str, ignore_options: &[String]) -> Result<String> {
+        let mut entries: Vec<Entry> = vec![];
+        for entry in fs::read_dir(target_path)
+            .with_context(|| format!("Failed to read directory: {}", target_path))?
+        {
+            let path = entry.unwrap().path();
 
-        if metadata.is_file() {
-            fs::remove_file(&path).unwrap();
+            if Tree::is_ignored(path.to_str().unwrap(), ignore_options) {
+                continue;
+            }
+            let metadata = fs::symlink_metadata(&path).unwrap();
+
+            if metadata.is_file() {
+                let contents = fs::read_to_string(&path).unwrap();
+                let oid = hash_object(&contents, TypeObject::Blob).unwrap();
+                entries.push(Entry {
+                    path: path.to_str().unwrap().to_string(),
+                    oid: oid.to_string(),
+                    obj_type: TypeObject::Blob,
+                })
+            }
+            if metadata.is_dir() {
+                let oid = Tree::write_tree(path.to_str().unwrap(), ignore_options).unwrap();
+                entries.push(Entry {
+                    path: path.to_str().unwrap().to_string(),
+                    oid: oid.to_string(),
+                    obj_type: TypeObject::Tree,
+                })
+            }
         }
-        if metadata.is_dir() {
-            fs::remove_dir_all(&path).unwrap();
+
+        let mut tree = String::new();
+        entries.sort();
+        for entry in entries.iter() {
+            tree = tree + &entry.to_string();
+        }
+
+        let hash_tree = hash_object(&tree, TypeObject::Tree).unwrap();
+        Ok(hash_tree)
+    }
+
+    fn clear_current_directory(ignore_options: &[String]) {
+        for entry in fs::read_dir(".").unwrap() {
+            let path = entry.unwrap().path();
+            if Tree::is_ignored(path.to_str().unwrap(), ignore_options) {
+                continue;
+            }
+            let metadata = fs::symlink_metadata(&path).unwrap();
+
+            if metadata.is_file() {
+                fs::remove_file(&path).unwrap();
+            }
+            if metadata.is_dir() {
+                fs::remove_dir_all(&path).unwrap();
+            }
         }
     }
-}
 
-pub fn read_tree(oid: &str, ignore_options: &[String]) {
-    clear_current_directory(ignore_options);
-    let tree = get_object(oid, TypeObject::Tree).unwrap();
-    let entries = &get_tree(&tree).unwrap();
+    pub fn read_tree(oid: &str, ignore_options: &[String]) {
+        Tree::clear_current_directory(ignore_options);
+        let tree_contents = get_object(oid, TypeObject::Tree).unwrap();
+        let tree = &Tree::get_tree(&tree_contents).unwrap();
 
-    for entry in entries.iter() {
-        let path = Path::new(&entry.path);
-        let prefix = path.parent().unwrap();
-        if !prefix.exists() {
-            fs::create_dir_all(prefix).unwrap();
-        }
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(&entry.path)
-            .with_context(|| format!("Failed to read tree: {}", &entry.path))
+        for entry in tree.tree.iter() {
+            let path = Path::new(&entry.path);
+            let prefix = path.parent().unwrap();
+            if !prefix.exists() {
+                fs::create_dir_all(prefix).unwrap();
+            }
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(&entry.path)
+                .with_context(|| format!("Failed to read tree: {}", &entry.path))
+                .unwrap();
+
+            file.write_all(
+                data::get_object(&entry.oid, TypeObject::Blob)
+                    .unwrap()
+                    .as_bytes(),
+            )
             .unwrap();
-
-        file.write_all(
-            data::get_object(&entry.oid, TypeObject::Blob)
-                .unwrap()
-                .as_bytes(),
-        )
-        .unwrap();
-    }
-}
-
-fn get_tree(tree: &str) -> Result<Vec<Entry>> {
-    let mut entries = vec![];
-
-    for line in tree.lines() {
-        let entry = Entry::from(line);
-        match entry.obj_type {
-            TypeObject::Blob => {
-                entries.push(entry);
-            }
-            TypeObject::Tree => {
-                let tmp_tree = get_object(&entry.oid, TypeObject::Tree)?;
-                let mut tmp_entries = get_tree(&tmp_tree)?;
-                entries.append(&mut tmp_entries);
-            }
-            _ => return Err(anyhow!("Unknown tree entry.")),
         }
     }
 
-    Ok(entries)
-}
+    fn get_tree(tree: &str) -> Result<Self> {
+        let mut entries = vec![];
 
-fn is_ignored(path: &str, ignore_options: &[String]) -> bool {
-    let path = path.to_string();
-    if path.contains(".dsgit")
-        || path.contains(".dsgitignore")
-        || path.contains(".git")
-        || path.contains(".gitignore")
-        || path.contains(".github")
-    {
-        return true;
+        for line in tree.lines() {
+            let entry = Entry::from(line);
+            match entry.obj_type {
+                TypeObject::Blob => {
+                    entries.push(entry);
+                }
+                TypeObject::Tree => {
+                    let tmp_tree = get_object(&entry.oid, TypeObject::Tree)?;
+                    let mut tmp_tree = Tree::get_tree(&tmp_tree)?;
+                    entries.append(&mut tmp_tree.tree);
+                }
+                _ => return Err(anyhow!("Unknown tree entry.")),
+            }
+        }
+        Ok(Tree { tree: entries })
     }
-    for ignore_path in ignore_options.iter() {
-        if path.contains(ignore_path) {
+
+    fn is_ignored(path: &str, ignore_options: &[String]) -> bool {
+        let path = path.to_string();
+        if path.contains(".dsgit")
+            || path.contains(".dsgitignore")
+            || path.contains(".git")
+            || path.contains(".gitignore")
+            || path.contains(".github")
+        {
             return true;
         }
+        for ignore_path in ignore_options.iter() {
+            if path.contains(ignore_path) {
+                return true;
+            }
+        }
+        false
     }
-    false
 }
 
 #[derive(Debug, PartialEq)]
@@ -210,24 +216,24 @@ impl Commit {
             message,
         })
     }
-}
 
-pub fn commit(message: &str, ignore_options: &[String]) -> Result<String> {
-    let oid = write_tree(".", ignore_options)?;
-    let mut commit = String::from("tree ") + &oid + "\n";
+    pub fn commit(message: &str, ignore_options: &[String]) -> Result<String> {
+        let oid = Tree::write_tree(".", ignore_options)?;
+        let mut commit = String::from("tree ") + &oid + "\n";
 
-    if let Some(head) = data::get_ref("HEAD")? {
-        commit = commit + "parent " + &head + "\n"
+        if let Some(head) = data::get_ref("HEAD")? {
+            commit = commit + "parent " + &head + "\n"
+        }
+
+        commit = commit + "\n" + message + "\n";
+        let commit_oid = data::hash_object(&commit, data::TypeObject::Commit)?;
+        Ok(data::update_ref("HEAD", &commit_oid)?.to_owned())
     }
-
-    commit = commit + "\n" + message + "\n";
-    let commit_oid = data::hash_object(&commit, data::TypeObject::Commit)?;
-    Ok(data::update_ref("HEAD", &commit_oid)?.to_owned())
 }
 
 pub fn checkout(oid: &str, ignore_options: &[String]) {
     let commit = Commit::get_commit(oid).unwrap();
-    read_tree(&commit.tree, ignore_options);
+    Tree::read_tree(&commit.tree, ignore_options);
     let _ = data::update_ref("HEAD", oid);
 }
 
@@ -356,7 +362,7 @@ mod test {
         let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
         if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
             let expect_result = test_data(""); // Not need spefify os in linux or macos case.
-            let oid = write_tree(TARGET_PATH, ignore_files).unwrap();
+            let oid = Tree::write_tree(TARGET_PATH, ignore_files).unwrap();
             assert_eq!(oid, "758e8e0c0eae49610531a22c1778e10baece4415");
 
             let obj = get_object(&oid, TypeObject::Tree).unwrap();
@@ -367,7 +373,7 @@ mod test {
         }
         if cfg!(target_os = "windows") {
             let expect_result = test_data("windows");
-            let oid = write_tree(TARGET_PATH, ignore_files).unwrap();
+            let oid = Tree::write_tree(TARGET_PATH, ignore_files).unwrap();
             assert_eq!(oid, "e64d4dd00d39e3f8f76337cbe3bab51a48d70708");
 
             let obj = get_object(&oid, TypeObject::Tree).unwrap();
@@ -393,14 +399,14 @@ mod test {
     fn test_read_tree() {
         fn assert_read_tree(expect_oid: &str, expect_paths: &[PathBuf; 4]) {
             let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
-            let oid = write_tree(TARGET_PATH, ignore_files).unwrap();
+            let oid = Tree::write_tree(TARGET_PATH, ignore_files).unwrap();
             assert_eq!(oid, expect_oid);
 
             fs::remove_file("./tests/cat.txt").unwrap();
             let paths = fs::read_dir("./tests").unwrap();
             assert_eq!(paths.count(), 3);
 
-            read_tree(&oid, ignore_files);
+            Tree::read_tree(&oid, ignore_files);
             let paths = fs::read_dir("./tests").unwrap();
             let got_paths = paths
                 .map(|res| res.map(|e| e.path()))
@@ -432,7 +438,7 @@ mod test {
         let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
 
         // First commit, not include parent hash.
-        let got_first_oid: String = commit("test", &ignore_files).unwrap().to_string();
+        let got_first_oid: String = Commit::commit("test", &ignore_files).unwrap().to_string();
 
         if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
             assert_eq!(&got_first_oid, "7679dce8118ba45c0e0698845d71db172b350852");
@@ -445,7 +451,9 @@ mod test {
         assert_eq!(contents[2], "test");
 
         // Second commit, include parent hash.
-        let got_second_oid: String = commit("second commit", &ignore_files).unwrap().to_string();
+        let got_second_oid: String = Commit::commit("second commit", &ignore_files)
+            .unwrap()
+            .to_string();
 
         if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
             assert_eq!(&got_second_oid, "6605e946039f5c20e9af1972736a3ecd012fe095");
@@ -466,8 +474,10 @@ mod test {
         setup();
         let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
 
-        let oid1 = commit("test", &ignore_files).unwrap().to_string();
-        let oid2 = commit("second commit", &ignore_files).unwrap().to_string();
+        let oid1 = Commit::commit("test", &ignore_files).unwrap().to_string();
+        let oid2 = Commit::commit("second commit", &ignore_files)
+            .unwrap()
+            .to_string();
 
         let commit1 = Commit::get_commit(&oid1).unwrap();
         assert!(matches!(commit1, Commit { parent: None, .. }));
@@ -498,12 +508,12 @@ mod test {
         setup();
         let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
 
-        let oid1 = commit("1st commit", &ignore_files).unwrap();
+        let oid1 = Commit::commit("1st commit", &ignore_files).unwrap();
         assert_number_files("./tests", 4);
 
         // Create a new file.
         fs::write("./tests/foo.txt", "foo bar").unwrap();
-        commit("2nd commit", &ignore_files).unwrap();
+        Commit::commit("2nd commit", &ignore_files).unwrap();
         assert_number_files("./tests", 5);
 
         // Checkout `1st commit` hash.
@@ -524,8 +534,8 @@ mod test {
     fn test_create_tag() {
         setup();
         let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
-        let oid1 = commit("1st commit", &ignore_files).unwrap();
-        let oid2 = commit("2nd commit", &ignore_files).unwrap();
+        let oid1 = Commit::commit("1st commit", &ignore_files).unwrap();
+        let oid2 = Commit::commit("2nd commit", &ignore_files).unwrap();
 
         create_tag("tag1", &oid1);
         let f1_path = format!("{}/refs/tags/tag1", DSGIT_DIR);
@@ -543,8 +553,8 @@ mod test {
     fn test_create_branch() {
         setup();
         let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
-        let oid1 = commit("1st commit", &ignore_files).unwrap();
-        let oid2 = commit("2nd commit", &ignore_files).unwrap();
+        let oid1 = Commit::commit("1st commit", &ignore_files).unwrap();
+        let oid2 = Commit::commit("2nd commit", &ignore_files).unwrap();
 
         create_branch("branch1", &oid1);
         let b1_path = format!("{}/refs/heads/branch1", DSGIT_DIR);
