@@ -21,6 +21,13 @@ enum Commands {
     Branch((String, Option<String>)),
 }
 
+fn check_args(args: &[String], expect_length: usize, err_msg: &'static str) -> Result<()> {
+    if args.len() != expect_length {
+        return Err(anyhow!(err_msg));
+    }
+    Ok(())
+}
+
 fn arg_parse() -> Result<Commands> {
     let args: Vec<String> = env::args().collect();
 
@@ -38,47 +45,57 @@ fn arg_parse() -> Result<Commands> {
                 }
             }
             "cat-object" => {
+                let err_msg = "dsgit: `cat-object` required commit-hash.";
+                check_args(&args, 3, err_msg)?;
                 let f: String = args[2].to_owned();
                 Commands::Cat(f)
             }
             "hash-object" => {
+                let err_msg = "dsgit: `hash-object` required commit-hash.";
+                check_args(&args, 3, err_msg)?;
                 let f: String = args[2].to_owned();
                 Commands::HashObject(f)
             }
             "read-tree" => {
+                let err_msg = "dsgit: `read-tree` required commit-hash.";
+                check_args(&args, 3, err_msg)?;
                 let f: String = args[2].to_owned();
                 Commands::ReadTree(f)
             }
-            "commit" | "-m" => match args[2].as_str() {
-                "-m" | "--message" => {
-                    let msg: String = args[3].to_owned();
-                    Commands::Commit(msg)
-                }
-                _ => return Err(anyhow!("dsgit: commit required '-m' or '--message'.")),
-            },
-            "branch" => {
-                if args.len() < 3 {
-                    return Err(anyhow!(
-                        "dsgit: branch required branch-name, and (option) commit-hash."
-                    ));
-                } else {
-                    let branch_name: String = args[2].to_owned();
-                    if args.len() == 3 {
-                        Commands::Branch((branch_name, None))
-                    } else {
-                        let oid: String = args[3].to_owned();
-                        Commands::Branch((branch_name, Some(oid)))
+            "commit" | "-m" => {
+                let err_msg = "dsgit: `commit` required '-m' or '--message' and message.";
+                check_args(&args, 4, err_msg)?;
+                match args[2].as_str() {
+                    "-m" | "--message" => {
+                        let msg: String = args[3].to_owned();
+                        Commands::Commit(msg)
                     }
+                    _ => return Err(anyhow!(err_msg)),
+                }
+            }
+            "branch" => {
+                if args.len() == 3 {
+                    let branch_name: String = args[2].to_owned();
+                    Commands::Branch((branch_name, None))
+                } else {
+                    let err_msg = "dsgit: `branch` required branch-name, and (option) commit-hash.";
+                    check_args(&args, 4, err_msg)?;
+
+                    let branch_name: String = args[2].to_owned();
+                    let oid: String = args[3].to_owned();
+                    Commands::Branch((branch_name, Some(oid)))
                 }
             }
             "checkout" => {
+                let err_msg = "dsgit: `checkout` required branch-name or commit-hash.";
+                check_args(&args, 3, err_msg)?;
                 let oid: String = args[2].to_owned();
                 Commands::Checkout(oid)
             }
             "tag" => {
                 if args.len() < 3 {
                     return Err(anyhow!(
-                        "dsgit: tag required tag-name, and (option) commit-hash."
+                        "dsgit: `tag` required tag-name, and (option) commit-hash."
                     ));
                 } else {
                     let tag: String = args[2].to_owned();
