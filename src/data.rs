@@ -54,13 +54,15 @@ pub fn sha1_hash(data: impl AsRef<[u8]>, out: &mut [u8]) {
 }
 
 pub struct RefValue {
+    pub ref_oid: String,
     pub symbolic: bool,
     pub value: String,
 }
 
 impl RefValue {
-    pub fn new(symbolic: bool, value: &str) -> Self {
+    pub fn new(ref_oid: &str, symbolic: bool, value: &str) -> Self {
         RefValue {
+            ref_oid: ref_oid.to_owned(),
             symbolic,
             value: value.to_owned(),
         }
@@ -68,6 +70,11 @@ impl RefValue {
 
     pub fn update_ref<'a>(refs: &'a str, ref_value: &'a RefValue) -> Result<&'a str> {
         assert!(!ref_value.symbolic);
+        let refs = match RefValue::get_ref_internal(refs)? {
+            Some(ref_value) => ref_value.ref_oid,
+            // At first commit case, this returns None.
+            None => refs.to_owned(),
+        };
         let ref_path: String = format!("{}/{}", DSGIT_DIR, refs);
         let parent_path = Path::new(&ref_path).parent().unwrap();
 
@@ -83,6 +90,10 @@ impl RefValue {
     }
 
     pub fn get_ref(refs: &str) -> Result<Option<RefValue>> {
+        RefValue::get_ref_internal(refs)
+    }
+
+    fn get_ref_internal(refs: &str) -> Result<Option<RefValue>> {
         let ref_path = &format!("{}/{}", DSGIT_DIR, refs);
         if Path::new(ref_path).is_file() {
             let mut file = OpenOptions::new()
@@ -93,14 +104,13 @@ impl RefValue {
             let mut buf = String::from("");
             file.read_to_string(&mut buf)?;
 
-            if buf.starts_with("ref:") {
-                let ref_path: Vec<&str> = buf.split(':').collect();
-                return RefValue::get_ref(ref_path[1]);
+            // This means a symbolic reference.
+            if buf.is_empty() && buf.starts_with("ref:") {
+                let refs = buf.split(':').collect::<Vec<&str>>()[1];
+                return RefValue::get_ref_internal(refs);
             }
-            Ok(Some(RefValue {
-                symbolic: false,
-                value: buf,
-            }))
+
+            Ok(Some(RefValue::new(refs, false, &buf)))
         } else {
             Ok(None)
         }

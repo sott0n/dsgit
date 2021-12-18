@@ -227,7 +227,7 @@ impl Commit {
 
         commit = commit + "\n" + message + "\n";
         let commit_oid = data::hash_object(&commit, data::TypeObject::Commit)?;
-        let ref_value = data::RefValue::new(false, &commit_oid);
+        let ref_value = data::RefValue::new(&commit_oid, false, &commit_oid);
         Ok(data::RefValue::update_ref("HEAD", &ref_value)?.to_owned())
     }
 }
@@ -235,12 +235,12 @@ impl Commit {
 pub fn checkout(oid: &str, ignore_options: &[String]) {
     let commit = Commit::get_commit(oid).unwrap();
     Tree::read_tree(&commit.tree, ignore_options);
-    let ref_value = data::RefValue::new(false, oid);
+    let ref_value = data::RefValue::new(oid, false, oid);
     let _ = data::RefValue::update_ref("HEAD", &ref_value);
 }
 
 pub fn create_tag(tag: &str, oid: &str) {
-    let ref_value = data::RefValue::new(false, oid);
+    let ref_value = data::RefValue::new(oid, false, oid);
     let _ = data::RefValue::update_ref(&format!("refs/tags/{}", tag), &ref_value);
 }
 
@@ -276,7 +276,7 @@ pub fn get_oid(name: &str) -> Result<String> {
 
 pub fn create_branch(name: &str, oid: &str) {
     let ref_name = String::from("refs/heads/") + name;
-    let ref_value = data::RefValue::new(false, oid);
+    let ref_value = data::RefValue::new(oid, false, oid);
     let _ = data::RefValue::update_ref(&ref_name, &ref_value);
 }
 
