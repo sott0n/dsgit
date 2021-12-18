@@ -41,7 +41,7 @@ impl From<&str> for Entry {
 
 #[derive(Debug)]
 pub struct Tree {
-    tree: Vec<Entry>,
+    entries: Vec<Entry>,
 }
 
 impl Tree {
@@ -108,7 +108,7 @@ impl Tree {
         let tree_contents = get_object(oid, TypeObject::Tree).unwrap();
         let tree = &Tree::get_tree(&tree_contents).unwrap();
 
-        for entry in tree.tree.iter() {
+        for entry in tree.entries.iter() {
             let path = Path::new(&entry.path);
             let prefix = path.parent().unwrap();
             if !prefix.exists() {
@@ -142,12 +142,12 @@ impl Tree {
                 TypeObject::Tree => {
                     let tmp_tree = get_object(&entry.oid, TypeObject::Tree)?;
                     let mut tmp_tree = Tree::get_tree(&tmp_tree)?;
-                    entries.append(&mut tmp_tree.tree);
+                    entries.append(&mut tmp_tree.entries);
                 }
                 _ => return Err(anyhow!("Unknown tree entry.")),
             }
         }
-        Ok(Tree { tree: entries })
+        Ok(Tree { entries })
     }
 
     fn is_ignored(path: &str, ignore_options: &[String]) -> bool {
