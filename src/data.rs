@@ -68,13 +68,20 @@ impl RefValue {
         }
     }
 
-    pub fn update_ref<'a>(refs: &'a str, ref_value: &'a RefValue, deref: bool) -> Result<&'a str> {
-        assert!(!ref_value.symbolic);
+    pub fn update_ref<'a>(refs: &'a str, ref_value: &'a RefValue, deref: bool) -> Result<String> {
         let refs = match RefValue::get_ref_internal(refs, deref)? {
             Some(ref_value) => ref_value.ref_oid,
             // At first commit case, this returns None.
             None => refs.to_owned(),
         };
+
+        assert!(!ref_value.value.is_empty());
+        let value: String = if ref_value.symbolic {
+            String::from("ref: ") + &ref_value.value
+        } else {
+            ref_value.value.to_owned()
+        };
+
         let ref_path: String = format!("{}/{}", DSGIT_DIR, refs);
         let parent_path = Path::new(&ref_path).parent().unwrap();
 
@@ -85,8 +92,8 @@ impl RefValue {
             .open(&ref_path)
             .with_context(|| format!("Failed to open object file: {}", ref_path))?;
 
-        file.write_all(ref_value.value.as_bytes()).unwrap();
-        Ok(&ref_value.value)
+        file.write_all(value.as_bytes()).unwrap();
+        Ok(value)
     }
 
     pub fn get_ref(refs: &str, deref: bool) -> Result<Option<RefValue>> {

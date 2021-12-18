@@ -228,7 +228,7 @@ impl Commit {
         commit = commit + "\n" + message + "\n";
         let commit_oid = data::hash_object(&commit, data::TypeObject::Commit)?;
         let ref_value = data::RefValue::new(&commit_oid, false, &commit_oid);
-        Ok(data::RefValue::update_ref("HEAD", &ref_value, true)?.to_owned())
+        data::RefValue::update_ref("HEAD", &ref_value, true)
     }
 }
 
