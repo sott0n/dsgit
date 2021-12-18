@@ -221,14 +221,14 @@ impl Commit {
         let oid = Tree::write_tree(".", ignore_options)?;
         let mut commit = String::from("tree ") + &oid + "\n";
 
-        if let Some(ref_value) = data::RefValue::get_ref("HEAD")? {
+        if let Some(ref_value) = data::RefValue::get_ref("HEAD", true)? {
             commit = commit + "parent " + &ref_value.value + "\n"
         }
 
         commit = commit + "\n" + message + "\n";
         let commit_oid = data::hash_object(&commit, data::TypeObject::Commit)?;
         let ref_value = data::RefValue::new(&commit_oid, false, &commit_oid);
-        Ok(data::RefValue::update_ref("HEAD", &ref_value)?.to_owned())
+        Ok(data::RefValue::update_ref("HEAD", &ref_value, true)?.to_owned())
     }
 }
 
@@ -236,12 +236,12 @@ pub fn checkout(oid: &str, ignore_options: &[String]) {
     let commit = Commit::get_commit(oid).unwrap();
     Tree::read_tree(&commit.tree, ignore_options);
     let ref_value = data::RefValue::new(oid, false, oid);
-    let _ = data::RefValue::update_ref("HEAD", &ref_value);
+    data::RefValue::update_ref("HEAD", &ref_value, true).unwrap();
 }
 
 pub fn create_tag(tag: &str, oid: &str) {
     let ref_value = data::RefValue::new(oid, false, oid);
-    let _ = data::RefValue::update_ref(&format!("refs/tags/{}", tag), &ref_value);
+    data::RefValue::update_ref(&format!("refs/tags/{}", tag), &ref_value, true).unwrap();
 }
 
 pub fn get_oid(name: &str) -> Result<String> {
@@ -252,7 +252,7 @@ pub fn get_oid(name: &str) -> Result<String> {
         format!("refs/heads/{}", name),
     ];
     for path in refs_walk.iter() {
-        match data::RefValue::get_ref(path)? {
+        match data::RefValue::get_ref(path, false)? {
             Some(ref_value) => return Ok(ref_value.value),
             None => continue,
         };
@@ -277,7 +277,7 @@ pub fn get_oid(name: &str) -> Result<String> {
 pub fn create_branch(name: &str, oid: &str) {
     let ref_name = String::from("refs/heads/") + name;
     let ref_value = data::RefValue::new(oid, false, oid);
-    let _ = data::RefValue::update_ref(&ref_name, &ref_value);
+    data::RefValue::update_ref(&ref_name, &ref_value, true).unwrap();
 }
 
 #[cfg(test)]

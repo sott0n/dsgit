@@ -133,7 +133,7 @@ fn init() {
 fn log(tag_or_oid: Option<String>) {
     let mut oid = match tag_or_oid {
         Some(tag_or_oid) => base::get_oid(&tag_or_oid).unwrap(),
-        None => match data::RefValue::get_ref("HEAD").unwrap() {
+        None => match data::RefValue::get_ref("HEAD", true).unwrap() {
             Some(ref_value) => ref_value.value,
             None => return,
         },
@@ -262,14 +262,24 @@ fn main() {
         Commands::Tag((tag, oid_or_none)) => {
             let oid = match oid_or_none {
                 Some(oid) => oid,
-                None => data::RefValue::get_ref("HEAD").unwrap().unwrap().value,
+                None => {
+                    data::RefValue::get_ref("HEAD", true)
+                        .unwrap()
+                        .unwrap()
+                        .value
+                }
             };
             create_tag(&tag, &oid);
         }
         Commands::Branch((name, oid_or_none)) => {
             let oid = match oid_or_none {
                 Some(oid) => oid,
-                None => data::RefValue::get_ref("HEAD").unwrap().unwrap().value,
+                None => {
+                    data::RefValue::get_ref("HEAD", true)
+                        .unwrap()
+                        .unwrap()
+                        .value
+                }
             };
             branch(&name, &oid);
         }

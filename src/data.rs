@@ -68,9 +68,9 @@ impl RefValue {
         }
     }
 
-    pub fn update_ref<'a>(refs: &'a str, ref_value: &'a RefValue) -> Result<&'a str> {
+    pub fn update_ref<'a>(refs: &'a str, ref_value: &'a RefValue, deref: bool) -> Result<&'a str> {
         assert!(!ref_value.symbolic);
-        let refs = match RefValue::get_ref_internal(refs)? {
+        let refs = match RefValue::get_ref_internal(refs, deref)? {
             Some(ref_value) => ref_value.ref_oid,
             // At first commit case, this returns None.
             None => refs.to_owned(),
@@ -89,11 +89,11 @@ impl RefValue {
         Ok(&ref_value.value)
     }
 
-    pub fn get_ref(refs: &str) -> Result<Option<RefValue>> {
-        RefValue::get_ref_internal(refs)
+    pub fn get_ref(refs: &str, deref: bool) -> Result<Option<RefValue>> {
+        RefValue::get_ref_internal(refs, deref)
     }
 
-    fn get_ref_internal(refs: &str) -> Result<Option<RefValue>> {
+    fn get_ref_internal(refs: &str, deref: bool) -> Result<Option<RefValue>> {
         let ref_path = &format!("{}/{}", DSGIT_DIR, refs);
         if Path::new(ref_path).is_file() {
             let mut file = OpenOptions::new()
@@ -101,16 +101,20 @@ impl RefValue {
                 .open(ref_path)
                 .with_context(|| format!("Failed to open file: {}", ref_path))?;
 
-            let mut buf = String::from("");
-            file.read_to_string(&mut buf)?;
+            let mut value = String::from("");
+            file.read_to_string(&mut value)?;
 
             // This means a symbolic reference.
-            if buf.is_empty() && buf.starts_with("ref:") {
-                let refs = buf.split(':').collect::<Vec<&str>>()[1];
-                return RefValue::get_ref_internal(refs);
+            let symbolic = value.is_empty() && value.starts_with("ref:");
+
+            if symbolic {
+                let value = value.split(':').collect::<Vec<&str>>()[1];
+                if deref {
+                    return RefValue::get_ref_internal(value, true);
+                }
             }
 
-            Ok(Some(RefValue::new(refs, false, &buf)))
+            Ok(Some(RefValue::new(refs, symbolic, &value)))
         } else {
             Ok(None)
         }
