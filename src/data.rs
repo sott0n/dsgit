@@ -53,39 +53,57 @@ pub fn sha1_hash(data: impl AsRef<[u8]>, out: &mut [u8]) {
     out.copy_from_slice(&hasher.finalize())
 }
 
-pub fn update_ref<'a>(refs: &'a str, oid: &'a str) -> Result<&'a str> {
-    let ref_path: String = format!("{}/{}", DSGIT_DIR, refs);
-    let parent_path = Path::new(&ref_path).parent().unwrap();
-
-    fs::create_dir_all(parent_path)?;
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(&ref_path)
-        .with_context(|| format!("Failed to open object file: {}", ref_path))?;
-
-    file.write_all(oid.as_bytes()).unwrap();
-    Ok(oid)
+pub struct RefValue {
+    pub symbolic: bool,
+    pub value: String,
 }
 
-pub fn get_ref(refs: &str) -> Result<Option<String>> {
-    let ref_path = &format!("{}/{}", DSGIT_DIR, refs);
-    if Path::new(ref_path).is_file() {
-        let mut file = OpenOptions::new()
-            .read(true)
-            .open(ref_path)
-            .with_context(|| format!("Failed to open file: {}", ref_path))?;
-
-        let mut buf = String::from("");
-        file.read_to_string(&mut buf)?;
-
-        if buf.starts_with("ref:") {
-            let ref_path: Vec<&str> = buf.split(':').collect();
-            return get_ref(ref_path[1]);
+impl RefValue {
+    pub fn new(symbolic: bool, value: &str) -> Self {
+        RefValue {
+            symbolic,
+            value: value.to_owned(),
         }
-        Ok(Some(buf))
-    } else {
-        Ok(None)
+    }
+
+    pub fn update_ref<'a>(refs: &'a str, ref_value: &'a RefValue) -> Result<&'a str> {
+        assert!(!ref_value.symbolic);
+        let ref_path: String = format!("{}/{}", DSGIT_DIR, refs);
+        let parent_path = Path::new(&ref_path).parent().unwrap();
+
+        fs::create_dir_all(parent_path)?;
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(&ref_path)
+            .with_context(|| format!("Failed to open object file: {}", ref_path))?;
+
+        file.write_all(ref_value.value.as_bytes()).unwrap();
+        Ok(&ref_value.value)
+    }
+
+    pub fn get_ref(refs: &str) -> Result<Option<RefValue>> {
+        let ref_path = &format!("{}/{}", DSGIT_DIR, refs);
+        if Path::new(ref_path).is_file() {
+            let mut file = OpenOptions::new()
+                .read(true)
+                .open(ref_path)
+                .with_context(|| format!("Failed to open file: {}", ref_path))?;
+
+            let mut buf = String::from("");
+            file.read_to_string(&mut buf)?;
+
+            if buf.starts_with("ref:") {
+                let ref_path: Vec<&str> = buf.split(':').collect();
+                return RefValue::get_ref(ref_path[1]);
+            }
+            Ok(Some(RefValue {
+                symbolic: false,
+                value: buf,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 }
 
