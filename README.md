@@ -8,8 +8,7 @@ A toy version management written in Rust.
 
 ```
 ❯ 🍻 cargo run -- --help
-   Compiling dsgit v0.1.0 (/Users/sott0n/workspace/dsgit)
-    Finished dev [unoptimized + debuginfo] target(s) in 0.81s
+    Finished dev [unoptimized + debuginfo] target(s) in 0.02s
      Running `target/debug/dsgit --help`
 dsgit: A toy version management system written in Rust.
 
@@ -24,7 +23,7 @@ COMMANDS:
     read-tree [OID]            : Read a tree objects from specified tree oid.
     write-tree                 : Write a tree objects structure into .dsgit.
     commit [MESSAGE]           : Record changes to the repository.
-    checkout [OID]             : Switch branch or restore working tree's files.
+    switcn [COMMIT]            : Switch branch or restore working tree's files.
     tag [TAG NAME] [OID]       : Set a mark to commit hash.
     branch [BRANCH NAME] [OID] : Diverge from the main line of development and continue to do work without messing with that main line.
 ```
