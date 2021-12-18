@@ -53,6 +53,7 @@ pub fn sha1_hash(data: impl AsRef<[u8]>, out: &mut [u8]) {
     out.copy_from_slice(&hasher.finalize())
 }
 
+#[derive(Debug)]
 pub struct RefValue {
     pub ref_oid: String,
     pub symbolic: bool,
@@ -77,7 +78,7 @@ impl RefValue {
 
         assert!(!ref_value.value.is_empty());
         let value: String = if ref_value.symbolic {
-            String::from("ref: ") + &ref_value.value
+            String::from("ref:") + &ref_value.value
         } else {
             ref_value.value.to_owned()
         };
@@ -89,10 +90,12 @@ impl RefValue {
         let mut file = OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(true)
             .open(&ref_path)
             .with_context(|| format!("Failed to open object file: {}", ref_path))?;
 
         file.write_all(value.as_bytes()).unwrap();
+        file.flush().unwrap();
         Ok(value)
     }
 
@@ -112,15 +115,13 @@ impl RefValue {
             file.read_to_string(&mut value)?;
 
             // This means a symbolic reference.
-            let symbolic = value.is_empty() && value.starts_with("ref:");
-
+            let symbolic = !value.is_empty() && value.starts_with("ref:");
             if symbolic {
                 let value = value.split(':').collect::<Vec<&str>>()[1];
                 if deref {
                     return RefValue::get_ref_internal(value, true);
                 }
             }
-
             Ok(Some(RefValue::new(refs, symbolic, &value)))
         } else {
             Ok(None)

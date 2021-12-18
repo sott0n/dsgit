@@ -232,11 +232,24 @@ impl Commit {
     }
 }
 
-pub fn checkout(oid: &str, ignore_options: &[String]) {
-    let commit = Commit::get_commit(oid).unwrap();
+pub fn switch(name: &str, ignore_options: &[String]) {
+    let oid = get_oid(name).unwrap();
+    let commit = Commit::get_commit(&oid).unwrap();
     Tree::read_tree(&commit.tree, ignore_options);
-    let ref_value = data::RefValue::new(oid, false, oid);
-    data::RefValue::update_ref("HEAD", &ref_value, true).unwrap();
+
+    let head_ref = if is_branch(name) {
+        let value = String::from("refs/heads/") + name;
+        data::RefValue::new(&oid, true, &value)
+    } else {
+        data::RefValue::new(&oid, false, &oid)
+    };
+
+    data::RefValue::update_ref("HEAD", &head_ref, false).unwrap();
+}
+
+fn is_branch(name: &str) -> bool {
+    let p = String::from("refs/heads/") + name;
+    data::RefValue::get_ref(&p, true).unwrap().is_some()
 }
 
 pub fn create_tag(tag: &str, oid: &str) {
@@ -405,7 +418,6 @@ mod test {
             let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
             let oid = Tree::write_tree(TARGET_PATH, ignore_files).unwrap();
             assert_eq!(oid, expect_oid);
-
             fs::remove_file("./tests/cat.txt").unwrap();
             let paths = fs::read_dir("./tests").unwrap();
             assert_eq!(paths.count(), 3);
@@ -500,7 +512,7 @@ mod test {
 
     #[test]
     #[serial]
-    fn test_checkout() {
+    fn test_switch() {
         fn assert_number_files(path: &str, expected: usize) {
             let files = fs::read_dir(path)
                 .unwrap()
@@ -520,9 +532,16 @@ mod test {
         Commit::commit("2nd commit", &ignore_files).unwrap();
         assert_number_files("./tests", 5);
 
-        // Checkout `1st commit` hash.
-        checkout(&oid1, &ignore_files);
+        // Switch `1st commit` hash.
+        switch(&oid1, &ignore_files);
         assert_number_files("./tests", 4);
+
+        // Switch branch.
+        create_branch("branch1", &oid1);
+        switch("branch1", &ignore_files);
+        let head_path = format!("{}/HEAD", DSGIT_DIR);
+        let expect_val = "ref:refs/heads/branch1".to_string();
+        assert_file_contents(&head_path, vec![expect_val]);
     }
 
     fn assert_file_contents(path: &str, expects: Vec<String>) {

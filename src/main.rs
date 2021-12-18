@@ -16,7 +16,7 @@ enum Commands {
     HashObject(String),
     ReadTree(String),
     Commit(String),
-    Checkout(String),
+    Switch(String),
     Tag((String, Option<String>)),
     Branch((String, Option<String>)),
 }
@@ -86,11 +86,11 @@ fn arg_parse() -> Result<Commands> {
                     Commands::Branch((branch_name, Some(oid)))
                 }
             }
-            "checkout" => {
-                let err_msg = "dsgit: `checkout` required branch-name or commit-hash.";
+            "switch" => {
+                let err_msg = "dsgit: `switch` required branch-name or commit-hash.";
                 check_args(&args, 3, err_msg)?;
-                let oid: String = args[2].to_owned();
-                Commands::Checkout(oid)
+                let commit: String = args[2].to_owned();
+                Commands::Switch(commit)
             }
             "tag" => {
                 if args.len() < 3 {
@@ -138,6 +138,7 @@ fn log(tag_or_oid: Option<String>) {
             None => return,
         },
     };
+    dbg!(&oid);
 
     loop {
         let commit = base::Commit::get_commit(&oid).unwrap();
@@ -196,9 +197,8 @@ fn commit(msg: &str, ignore_files: Vec<String>) {
     println!("{:#}", oid);
 }
 
-fn checkout(tag_or_oid: &str, ignore_files: Vec<String>) {
-    let oid = base::get_oid(tag_or_oid).unwrap();
-    base::checkout(&oid, &ignore_files);
+fn switch(commit: &str, ignore_files: Vec<String>) {
+    base::switch(commit, &ignore_files);
 }
 
 fn create_tag(tag: &str, tag_or_oid: &str) {
@@ -227,7 +227,7 @@ COMMANDS:
     read-tree [OID]            : Read a tree objects from specified tree oid.
     write-tree                 : Write a tree objects structure into .dsgit.
     commit [MESSAGE]           : Record changes to the repository.
-    checkout [OID]             : Switch branch or restore working tree's files.
+    switcn [COMMIT]            : Switch branch or restore working tree's files.
     tag [TAG NAME] [OID]       : Set a mark to commit hash.
     branch [BRANCH NAME] [OID] : Diverge from the main line of development and \
 continue to do work without messing with that main line.
@@ -255,9 +255,9 @@ fn main() {
             let ignore_files = read_ignore_file();
             commit(&msg, ignore_files);
         }
-        Commands::Checkout(oid) => {
+        Commands::Switch(commit) => {
             let ignore_files = read_ignore_file();
-            checkout(&oid, ignore_files);
+            switch(&commit, ignore_files);
         }
         Commands::Tag((tag, oid_or_none)) => {
             let oid = match oid_or_none {
