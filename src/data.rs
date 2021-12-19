@@ -181,7 +181,9 @@ mod test {
     #[serial]
     fn test_init() {
         // Remove `.dsgit` to pass init before this test.
-        fs::remove_dir_all(DSGIT_DIR).unwrap();
+        if Path::new(DSGIT_DIR).exists() {
+            fs::remove_dir_all(DSGIT_DIR).unwrap();
+        }
 
         init().unwrap();
         let head_path = format!("{}/HEAD", DSGIT_DIR);
