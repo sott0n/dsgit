@@ -19,6 +19,7 @@ enum Commands {
     Switch(String),
     Tag((String, Option<String>)),
     Branch((String, Option<String>)),
+    Status,
 }
 
 fn check_args(args: &[String], expect_length: usize, err_msg: &'static str) -> Result<()> {
@@ -107,6 +108,7 @@ fn arg_parse() -> Result<Commands> {
                     }
                 }
             }
+            "status" => Commands::Status,
             _ => {
                 return Err(anyhow!(
                     "dsgit: '{}' is not a dsgit command. See 'dsgit --help'.",
@@ -138,7 +140,6 @@ fn log(tag_or_oid: Option<String>) {
             None => return,
         },
     };
-    dbg!(&oid);
 
     loop {
         let commit = base::Commit::get_commit(&oid).unwrap();
@@ -211,6 +212,14 @@ fn branch(name: &str, oid: &str) {
     println!("Created a branch: {} at {}", name, oid);
 }
 
+fn status() {
+    let oid = base::get_oid("HEAD").unwrap();
+    match base::get_branch_name().unwrap() {
+        Some(branch) => println!("On branch {}", branch),
+        None => println!("HEAD detached at {}", &oid[10..]),
+    }
+}
+
 fn help() {
     println!(
         "\
@@ -231,6 +240,7 @@ COMMANDS:
     tag [TAG NAME] [COMMIT]       : Set a mark to commit hash.
     branch [BRANCH NAME] [COMMIT] : Diverge from the main line of development and \
 continue to do work without messing with that main line.
+    status                        : Display a current status of version management.
 "
     );
     exit(0);
@@ -283,5 +293,6 @@ fn main() {
             };
             branch(&name, &oid);
         }
+        Commands::Status => status(),
     }
 }

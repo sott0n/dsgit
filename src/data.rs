@@ -117,11 +117,11 @@ impl RefValue {
             // This means a symbolic reference.
             let symbolic = !value.is_empty() && value.starts_with("ref:");
             if symbolic {
-                let value = value.split(':').collect::<Vec<&str>>()[1];
+                value = value.split(':').collect::<Vec<&str>>()[1].to_string();
                 if deref {
-                    return RefValue::get_ref_internal(value, true);
+                    return RefValue::get_ref_internal(&value, true);
                 }
-            }
+            };
             Ok(Some(RefValue::new(Some(refs), symbolic, &value)))
         } else {
             Ok(None)

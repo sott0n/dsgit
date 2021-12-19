@@ -262,6 +262,28 @@ fn is_branch(name: &str) -> bool {
     data::RefValue::get_ref(&p, true).unwrap().is_some()
 }
 
+pub fn get_branch_name() -> Result<Option<String>> {
+    let head_ref = match data::RefValue::get_ref("HEAD", false)? {
+        Some(head_ref) => head_ref,
+        None => return Err(anyhow!("A `HEAD` file is not found.")),
+    };
+
+    if !head_ref.symbolic {
+        return Ok(None);
+    };
+
+    assert!(head_ref.value.starts_with("refs/heads/"));
+    let head_path = Path::new(&head_ref.value);
+    let base_path = Path::new("refs/heads");
+    let rel_path = head_path
+        .strip_prefix(base_path)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    Ok(Some(rel_path))
+}
+
 pub fn create_tag(tag: &str, oid: &str) {
     let ref_value = data::RefValue::new(Some(oid), false, oid);
     data::RefValue::update_ref(&format!("refs/tags/{}", tag), &ref_value, true).unwrap();
