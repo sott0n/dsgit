@@ -8,6 +8,16 @@ use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
 
+pub fn init() {
+    data::init().unwrap();
+    data::RefValue::update_ref(
+        "HEAD",
+        &data::RefValue::new(None, true, "refs/heads/main"),
+        true,
+    )
+    .unwrap();
+}
+
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Entry {
     path: String,
@@ -227,7 +237,7 @@ impl Commit {
 
         commit = commit + "\n" + message + "\n";
         let commit_oid = data::hash_object(&commit, data::TypeObject::Commit)?;
-        let ref_value = data::RefValue::new(&commit_oid, false, &commit_oid);
+        let ref_value = data::RefValue::new(Some(&commit_oid), false, &commit_oid);
         data::RefValue::update_ref("HEAD", &ref_value, true)
     }
 }
@@ -239,9 +249,9 @@ pub fn switch(name: &str, ignore_options: &[String]) {
 
     let head_ref = if is_branch(name) {
         let value = String::from("refs/heads/") + name;
-        data::RefValue::new(&oid, true, &value)
+        data::RefValue::new(Some(&oid), true, &value)
     } else {
-        data::RefValue::new(&oid, false, &oid)
+        data::RefValue::new(Some(&oid), false, &oid)
     };
 
     data::RefValue::update_ref("HEAD", &head_ref, false).unwrap();
@@ -253,7 +263,7 @@ fn is_branch(name: &str) -> bool {
 }
 
 pub fn create_tag(tag: &str, oid: &str) {
-    let ref_value = data::RefValue::new(oid, false, oid);
+    let ref_value = data::RefValue::new(Some(oid), false, oid);
     data::RefValue::update_ref(&format!("refs/tags/{}", tag), &ref_value, true).unwrap();
 }
 
@@ -289,14 +299,14 @@ pub fn get_oid(name: &str) -> Result<String> {
 
 pub fn create_branch(name: &str, oid: &str) {
     let ref_name = String::from("refs/heads/") + name;
-    let ref_value = data::RefValue::new(oid, false, oid);
+    let ref_value = data::RefValue::new(Some(oid), false, oid);
     data::RefValue::update_ref(&ref_name, &ref_value, true).unwrap();
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use data::{get_object, init};
+    use data::get_object;
     use serial_test::serial;
     use std::collections::HashSet;
     use std::fs;
@@ -319,7 +329,7 @@ mod test {
 
     fn setup() {
         let _ = fs::remove_dir_all(DSGIT_DIR);
-        let _ = init();
+        init();
     }
 
     fn test_data(target_os: &str) -> [Entry; 4] {
@@ -370,6 +380,26 @@ mod test {
                 },
             ],
         }
+    }
+
+    fn assert_file_contents(path: &str, expects: Vec<String>) {
+        let f1 = fs::File::open(path).unwrap();
+        let f1_contents = io::BufReader::new(f1);
+        for (got, expect) in f1_contents.lines().zip(expects) {
+            assert_eq!(got.unwrap(), expect);
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_init() {
+        // Remove `.dsgit` to pass init before this test.
+        fs::remove_dir_all(DSGIT_DIR).unwrap();
+
+        init();
+        let head_path = format!("{}/HEAD", DSGIT_DIR);
+        let expect_val = "ref:refs/heads/main".to_string();
+        assert_file_contents(&head_path, vec![expect_val]);
     }
 
     #[test]
@@ -542,14 +572,6 @@ mod test {
         let head_path = format!("{}/HEAD", DSGIT_DIR);
         let expect_val = "ref:refs/heads/branch1".to_string();
         assert_file_contents(&head_path, vec![expect_val]);
-    }
-
-    fn assert_file_contents(path: &str, expects: Vec<String>) {
-        let f1 = fs::File::open(path).unwrap();
-        let f1_contents = io::BufReader::new(f1);
-        for (got, expect) in f1_contents.lines().zip(expects) {
-            assert_eq!(got.unwrap(), expect);
-        }
     }
 
     #[test]

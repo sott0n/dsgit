@@ -55,15 +55,15 @@ pub fn sha1_hash(data: impl AsRef<[u8]>, out: &mut [u8]) {
 
 #[derive(Debug)]
 pub struct RefValue {
-    pub ref_oid: String,
+    pub ref_oid: Option<String>,
     pub symbolic: bool,
     pub value: String,
 }
 
 impl RefValue {
-    pub fn new(ref_oid: &str, symbolic: bool, value: &str) -> Self {
+    pub fn new(ref_oid: Option<&str>, symbolic: bool, value: &str) -> Self {
         RefValue {
-            ref_oid: ref_oid.to_owned(),
+            ref_oid: ref_oid.map(|oid| oid.to_owned()),
             symbolic,
             value: value.to_owned(),
         }
@@ -71,7 +71,7 @@ impl RefValue {
 
     pub fn update_ref<'a>(refs: &'a str, ref_value: &'a RefValue, deref: bool) -> Result<String> {
         let refs = match RefValue::get_ref_internal(refs, deref)? {
-            Some(ref_value) => ref_value.ref_oid,
+            Some(ref_value) => ref_value.ref_oid.unwrap(),
             // At first commit case, this returns None.
             None => refs.to_owned(),
         };
@@ -122,7 +122,7 @@ impl RefValue {
                     return RefValue::get_ref_internal(value, true);
                 }
             }
-            Ok(Some(RefValue::new(refs, symbolic, &value)))
+            Ok(Some(RefValue::new(Some(refs), symbolic, &value)))
         } else {
             Ok(None)
         }

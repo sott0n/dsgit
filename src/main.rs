@@ -122,7 +122,7 @@ fn arg_parse() -> Result<Commands> {
 }
 
 fn init() {
-    data::init().unwrap();
+    base::init();
     let path = env::current_dir().unwrap();
     println!(
         "Initialized empty DSGit repository in {}/.dsgit",
@@ -220,16 +220,16 @@ USAGE:
     dsgit [COMMANDS]
 
 COMMANDS:
-    --help | -h                : Show this help.
-    init                       : Initialize dsgit, creating `.dsgit` directory.
-    hash-object [FILE NAME]    : Given file, calculate hash object.
-    cat-object [FILE NAME]     : Given object id, display object's contents.
-    read-tree [OID]            : Read a tree objects from specified tree oid.
-    write-tree                 : Write a tree objects structure into .dsgit.
-    commit [MESSAGE]           : Record changes to the repository.
-    switcn [COMMIT]            : Switch branch or restore working tree's files.
-    tag [TAG NAME] [OID]       : Set a mark to commit hash.
-    branch [BRANCH NAME] [OID] : Diverge from the main line of development and \
+    --help | -h                   : Show this help.
+    init                          : Initialize dsgit, creating `.dsgit` directory.
+    hash-object [FILE NAME]       : Given file, calculate hash object.
+    cat-object [FILE NAME]        : Given object id, display object's contents.
+    read-tree [OID]               : Read a tree objects from specified tree oid.
+    write-tree                    : Write a tree objects structure into .dsgit.
+    commit [MESSAGE]              : Record changes to the repository.
+    switch [COMMIT]               : Switch branch or restore working tree's files.
+    tag [TAG NAME] [COMMIT]       : Set a mark to commit hash.
+    branch [BRANCH NAME] [COMMIT] : Diverge from the main line of development and \
 continue to do work without messing with that main line.
 "
     );
