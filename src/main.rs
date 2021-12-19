@@ -1,5 +1,7 @@
-pub mod base;
+pub mod commit;
 pub mod data;
+pub mod entry;
+pub mod reference;
 
 use anyhow::{anyhow, Result};
 use std::env;
@@ -124,7 +126,7 @@ fn arg_parse() -> Result<Commands> {
 }
 
 fn init() {
-    base::init();
+    data::init().unwrap();
     let path = env::current_dir().unwrap();
     println!(
         "Initialized empty DSGit repository in {}/.dsgit",
@@ -134,15 +136,15 @@ fn init() {
 
 fn log(tag_or_oid: Option<String>) {
     let mut oid = match tag_or_oid {
-        Some(tag_or_oid) => base::get_oid(&tag_or_oid).unwrap(),
-        None => match data::RefValue::get_ref("HEAD", true).unwrap() {
+        Some(tag_or_oid) => data::get_oid(&tag_or_oid).unwrap(),
+        None => match reference::RefValue::get_ref("HEAD", true).unwrap() {
             Some(ref_value) => ref_value.value,
             None => return,
         },
     };
 
     loop {
-        let commit = base::Commit::get_commit(&oid).unwrap();
+        let commit = commit::Commit::get_commit(&oid).unwrap();
         println!("commit {:#}", &oid);
         println!("tree   {:#}", &commit.tree);
         if let Some(parent_oid) = &commit.parent {
@@ -165,18 +167,18 @@ fn hash_object(file: &str) {
 }
 
 fn cat_object(tag_or_oid: &str) {
-    let oid = base::get_oid(tag_or_oid).unwrap();
+    let oid = data::get_oid(tag_or_oid).unwrap();
     let contents = data::get_object(&oid, data::TypeObject::Blob).unwrap();
     print!("{}", contents);
 }
 
 fn read_tree(tag_or_oid: &str, ignore_files: Vec<String>) {
-    let oid = base::get_oid(tag_or_oid).unwrap();
-    base::Tree::read_tree(&oid, &ignore_files);
+    let oid = data::get_oid(tag_or_oid).unwrap();
+    entry::Tree::read_tree(&oid, &ignore_files);
 }
 
 fn write_tree(ignore_files: Vec<String>) {
-    let oid = base::Tree::write_tree(".", &ignore_files).unwrap();
+    let oid = entry::Tree::write_tree(".", &ignore_files).unwrap();
     println!("{:#}", oid);
 }
 
@@ -194,27 +196,27 @@ fn read_ignore_file() -> Vec<String> {
 }
 
 fn commit(msg: &str, ignore_files: Vec<String>) {
-    let oid = base::Commit::commit(msg, &ignore_files).unwrap();
+    let oid = commit::Commit::commit(msg, &ignore_files).unwrap();
     println!("{:#}", oid);
 }
 
 fn switch(commit: &str, ignore_files: Vec<String>) {
-    base::switch(commit, &ignore_files);
+    reference::switch(commit, &ignore_files);
 }
 
 fn create_tag(tag: &str, tag_or_oid: &str) {
-    let oid = base::get_oid(tag_or_oid).unwrap();
-    base::create_tag(tag, &oid);
+    let oid = data::get_oid(tag_or_oid).unwrap();
+    reference::create_tag(tag, &oid);
 }
 
 fn branch(name: &str, oid: &str) {
-    base::create_branch(name, oid);
+    reference::create_branch(name, oid);
     println!("Created a branch: {} at {}", name, oid);
 }
 
 fn status() {
-    let oid = base::get_oid("HEAD").unwrap();
-    match base::get_branch_name().unwrap() {
+    let oid = data::get_oid("HEAD").unwrap();
+    match reference::get_branch_name().unwrap() {
         Some(branch) => println!("On branch {}", branch),
         None => println!("HEAD detached at {}", &oid[10..]),
     }
@@ -273,7 +275,7 @@ fn main() {
             let oid = match oid_or_none {
                 Some(oid) => oid,
                 None => {
-                    data::RefValue::get_ref("HEAD", true)
+                    reference::RefValue::get_ref("HEAD", true)
                         .unwrap()
                         .unwrap()
                         .value
@@ -285,7 +287,7 @@ fn main() {
             let oid = match oid_or_none {
                 Some(oid) => oid,
                 None => {
-                    data::RefValue::get_ref("HEAD", true)
+                    reference::RefValue::get_ref("HEAD", true)
                         .unwrap()
                         .unwrap()
                         .value

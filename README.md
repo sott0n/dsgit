@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/sott0n/dsgit/actions/workflows/ci.yml/badge.svg)](https://github.com/sott0n/dsgit/actions/workflows/ci.yml)
 
-A toy version management written in Rust.
+A toy version management system written in Rust.
 
 ## How to run
 

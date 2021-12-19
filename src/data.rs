@@ -1,12 +1,11 @@
+use crate::reference::RefValue;
 use anyhow::{anyhow, Context, Result};
 use hex;
 use sha1::{Digest, Sha1};
+use std::fmt;
 use std::fs::{create_dir, File, OpenOptions};
 use std::io::{Read, Write};
-use std::path::Path;
-use std::str;
 use std::str::FromStr;
-use std::{fmt, fs};
 
 const DSGIT_DIR: &str = ".dsgit";
 
@@ -14,6 +13,8 @@ pub fn init() -> Result<()> {
     create_dir(DSGIT_DIR)?;
     create_dir(format!("{}/objects", DSGIT_DIR))
         .with_context(|| format!("Failed to create a directory: {}/objects", DSGIT_DIR))?;
+
+    RefValue::update_ref("HEAD", &RefValue::new(None, true, "refs/heads/main"), true)?;
     Ok(())
 }
 
@@ -51,82 +52,6 @@ pub fn sha1_hash(data: impl AsRef<[u8]>, out: &mut [u8]) {
     let mut hasher = Sha1::new();
     hasher.update(data);
     out.copy_from_slice(&hasher.finalize())
-}
-
-#[derive(Debug)]
-pub struct RefValue {
-    pub ref_oid: Option<String>,
-    pub symbolic: bool,
-    pub value: String,
-}
-
-impl RefValue {
-    pub fn new(ref_oid: Option<&str>, symbolic: bool, value: &str) -> Self {
-        RefValue {
-            ref_oid: ref_oid.map(|oid| oid.to_owned()),
-            symbolic,
-            value: value.to_owned(),
-        }
-    }
-
-    pub fn update_ref<'a>(refs: &'a str, ref_value: &'a RefValue, deref: bool) -> Result<String> {
-        let refs = match RefValue::get_ref_internal(refs, deref)? {
-            Some(ref_value) => ref_value.ref_oid.unwrap(),
-            // At first commit case, this returns None.
-            None => refs.to_owned(),
-        };
-
-        assert!(!ref_value.value.is_empty());
-        let value: String = if ref_value.symbolic {
-            String::from("ref:") + &ref_value.value
-        } else {
-            ref_value.value.to_owned()
-        };
-
-        let ref_path: String = format!("{}/{}", DSGIT_DIR, refs);
-        let parent_path = Path::new(&ref_path).parent().unwrap();
-
-        fs::create_dir_all(parent_path)?;
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&ref_path)
-            .with_context(|| format!("Failed to open object file: {}", ref_path))?;
-
-        file.write_all(value.as_bytes()).unwrap();
-        file.flush().unwrap();
-        Ok(value)
-    }
-
-    pub fn get_ref(refs: &str, deref: bool) -> Result<Option<RefValue>> {
-        RefValue::get_ref_internal(refs, deref)
-    }
-
-    fn get_ref_internal(refs: &str, deref: bool) -> Result<Option<RefValue>> {
-        let ref_path = &format!("{}/{}", DSGIT_DIR, refs);
-        if Path::new(ref_path).is_file() {
-            let mut file = OpenOptions::new()
-                .read(true)
-                .open(ref_path)
-                .with_context(|| format!("Failed to open file: {}", ref_path))?;
-
-            let mut value = String::from("");
-            file.read_to_string(&mut value)?;
-
-            // This means a symbolic reference.
-            let symbolic = !value.is_empty() && value.starts_with("ref:");
-            if symbolic {
-                value = value.split(':').collect::<Vec<&str>>()[1].to_string();
-                if deref {
-                    return RefValue::get_ref_internal(&value, true);
-                }
-            };
-            Ok(Some(RefValue::new(Some(refs), symbolic, &value)))
-        } else {
-            Ok(None)
-        }
-    }
 }
 
 pub fn hash_object(data: &str, type_obj: TypeObject) -> Result<String> {
@@ -175,12 +100,44 @@ pub fn get_object(oid: &str, expected_type: TypeObject) -> Result<String> {
     Ok(objs[1].to_owned())
 }
 
+pub fn get_oid(name: &str) -> Result<String> {
+    let refs_walk = [
+        name.to_string(),
+        format!("refs/{}", name),
+        format!("refs/tags/{}", name),
+        format!("refs/heads/{}", name),
+    ];
+    for path in refs_walk.iter() {
+        match RefValue::get_ref(path, false)? {
+            Some(ref_value) => return Ok(ref_value.value),
+            None => continue,
+        };
+    }
+
+    // Check a given name is hash value.
+    let is_hex = name
+        .chars()
+        .collect::<Vec<char>>()
+        .iter()
+        .all(|c| c.is_ascii_hexdigit());
+    if name.len() == 40 && is_hex {
+        return Ok(name.to_string());
+    }
+
+    Err(anyhow!(format!(
+        "Unknown name and not hash value: {}",
+        name
+    )))
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use serial_test::serial;
     use std::assert;
     use std::fs;
+    use std::io;
+    use std::io::BufRead;
     use std::path::Path;
 
     const TEST_DATA: [(&str, &str, &str, &str, &str); 3] = [
@@ -209,7 +166,27 @@ mod test {
 
     fn setup() {
         let _ = fs::remove_dir_all(DSGIT_DIR);
-        let _ = init();
+        init().unwrap();
+    }
+
+    fn assert_file_contents(path: &str, expects: Vec<String>) {
+        let f1 = fs::File::open(path).unwrap();
+        let f1_contents = io::BufReader::new(f1);
+        for (got, expect) in f1_contents.lines().zip(expects) {
+            assert_eq!(got.unwrap(), expect);
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_init() {
+        // Remove `.dsgit` to pass init before this test.
+        fs::remove_dir_all(DSGIT_DIR).unwrap();
+
+        init().unwrap();
+        let head_path = format!("{}/HEAD", DSGIT_DIR);
+        let expect_val = "ref:refs/heads/main".to_string();
+        assert_file_contents(&head_path, vec![expect_val]);
     }
 
     #[test]
