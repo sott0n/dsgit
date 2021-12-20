@@ -6,6 +6,7 @@ use std::fs::{create_dir_all, OpenOptions};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::str;
+use walkdir::WalkDir;
 
 const DSGIT_DIR: &str = ".dsgit";
 
@@ -83,59 +84,76 @@ impl RefValue {
             Ok(None)
         }
     }
-}
 
-pub fn switch(name: &str, ignore_options: &[String]) {
-    let oid = get_oid(name).unwrap();
-    let commit = Commit::get_commit(&oid).unwrap();
-    Tree::read_tree(&commit.tree, ignore_options);
+    pub fn get_refs(prefix: &str, rel_path: &str) -> Result<Vec<String>> {
+        let mut refs = vec![String::from("HEAD")];
+        let prefix_root = format!("{}/{}", DSGIT_DIR, rel_path);
+        let prefix_rel_path = Path::new(&prefix_root);
+        for entry in WalkDir::new(format!("{}/refs/", DSGIT_DIR))
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| !e.file_type().is_dir())
+            .filter(|e| !e.file_name().to_str().unwrap().starts_with(&prefix))
+        {
+            let ref_path = entry.path().strip_prefix(prefix_rel_path)?;
+            refs.push(ref_path.to_str().unwrap().to_owned());
+        }
 
-    let head_ref = if is_branch(name) {
-        let value = String::from("refs/heads/") + name;
-        RefValue::new(Some(&oid), true, &value)
-    } else {
-        RefValue::new(Some(&oid), false, &oid)
-    };
+        Ok(refs)
+    }
 
-    RefValue::update_ref("HEAD", &head_ref, false).unwrap();
-}
+    pub fn switch(name: &str, ignore_options: &[String]) {
+        let oid = get_oid(name).unwrap();
+        let commit = Commit::get_commit(&oid).unwrap();
+        Tree::read_tree(&commit.tree, ignore_options);
 
-fn is_branch(name: &str) -> bool {
-    let p = String::from("refs/heads/") + name;
-    RefValue::get_ref(&p, true).unwrap().is_some()
-}
+        let head_ref = if RefValue::is_branch(name) {
+            let value = String::from("refs/heads/") + name;
+            RefValue::new(Some(&oid), true, &value)
+        } else {
+            RefValue::new(Some(&oid), false, &oid)
+        };
 
-pub fn get_branch_name() -> Result<Option<String>> {
-    let head_ref = match RefValue::get_ref("HEAD", false)? {
-        Some(head_ref) => head_ref,
-        None => return Err(anyhow!("A `HEAD` file is not found.")),
-    };
+        RefValue::update_ref("HEAD", &head_ref, false).unwrap();
+    }
 
-    if !head_ref.symbolic {
-        return Ok(None);
-    };
+    fn is_branch(name: &str) -> bool {
+        let p = String::from("refs/heads/") + name;
+        RefValue::get_ref(&p, true).unwrap().is_some()
+    }
 
-    assert!(head_ref.value.starts_with("refs/heads/"));
-    let head_path = Path::new(&head_ref.value);
-    let base_path = Path::new("refs/heads");
-    let rel_path = head_path
-        .strip_prefix(base_path)
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_owned();
-    Ok(Some(rel_path))
-}
+    pub fn get_branch_name() -> Result<Option<String>> {
+        let head_ref = match RefValue::get_ref("HEAD", false)? {
+            Some(head_ref) => head_ref,
+            None => return Err(anyhow!("A `HEAD` file is not found.")),
+        };
 
-pub fn create_tag(tag: &str, oid: &str) {
-    let ref_value = RefValue::new(Some(oid), false, oid);
-    RefValue::update_ref(&format!("refs/tags/{}", tag), &ref_value, true).unwrap();
-}
+        if !head_ref.symbolic {
+            return Ok(None);
+        };
 
-pub fn create_branch(name: &str, oid: &str) {
-    let ref_name = String::from("refs/heads/") + name;
-    let ref_value = RefValue::new(Some(oid), false, oid);
-    RefValue::update_ref(&ref_name, &ref_value, true).unwrap();
+        assert!(head_ref.value.starts_with("refs/heads/"));
+        let head_path = Path::new(&head_ref.value);
+        let base_path = Path::new("refs/heads");
+        let rel_path = head_path
+            .strip_prefix(base_path)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned();
+        Ok(Some(rel_path))
+    }
+
+    pub fn create_tag(tag: &str, oid: &str) {
+        let ref_value = RefValue::new(Some(oid), false, oid);
+        RefValue::update_ref(&format!("refs/tags/{}", tag), &ref_value, true).unwrap();
+    }
+
+    pub fn create_branch(name: &str, oid: &str) {
+        let ref_name = String::from("refs/heads/") + name;
+        let ref_value = RefValue::new(Some(oid), false, oid);
+        RefValue::update_ref(&ref_name, &ref_value, true).unwrap();
+    }
 }
 
 #[cfg(test)]
@@ -195,12 +213,12 @@ mod test {
         assert_number_files("./tests", 5);
 
         // Switch `1st commit` hash.
-        switch(&oid1, &ignore_files);
+        RefValue::switch(&oid1, &ignore_files);
         assert_number_files("./tests", 4);
 
         // Switch branch.
-        create_branch("branch1", &oid1);
-        switch("branch1", &ignore_files);
+        RefValue::create_branch("branch1", &oid1);
+        RefValue::switch("branch1", &ignore_files);
         let head_path = format!("{}/HEAD", DSGIT_DIR);
         let expect_val = "ref:refs/heads/branch1".to_string();
         assert_file_contents(&head_path, vec![expect_val]);
@@ -214,12 +232,12 @@ mod test {
         let oid1 = Commit::commit("1st commit", &ignore_files).unwrap();
         let oid2 = Commit::commit("2nd commit", &ignore_files).unwrap();
 
-        create_tag("tag1", &oid1);
+        RefValue::create_tag("tag1", &oid1);
         let f1_path = format!("{}/refs/tags/tag1", DSGIT_DIR);
         assert!(Path::new(&f1_path).exists());
         assert_file_contents(&f1_path, vec![oid1]);
 
-        create_tag("tag2", &oid2);
+        RefValue::create_tag("tag2", &oid2);
         let f2_path = format!("{}/refs/tags/tag2", DSGIT_DIR);
         assert!(Path::new(&f2_path).exists());
         assert_file_contents(&f2_path, vec![oid2]);
@@ -233,14 +251,29 @@ mod test {
         let oid1 = Commit::commit("1st commit", &ignore_files).unwrap();
         let oid2 = Commit::commit("2nd commit", &ignore_files).unwrap();
 
-        create_branch("branch1", &oid1);
+        RefValue::create_branch("branch1", &oid1);
         let b1_path = format!("{}/refs/heads/branch1", DSGIT_DIR);
         assert!(Path::new(&b1_path).exists());
         assert_file_contents(&b1_path, vec![oid1]);
 
-        create_branch("branch2", &oid2);
+        RefValue::create_branch("branch2", &oid2);
         let b2_path = format!("{}/refs/heads/branch2", DSGIT_DIR);
         assert!(Path::new(&b2_path).exists());
         assert_file_contents(&b2_path, vec![oid2]);
+    }
+
+    #[test]
+    #[serial]
+    fn test_get_all_branches() {
+        setup();
+        let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
+        let oid1 = Commit::commit("1st commit", &ignore_files).unwrap();
+        let oid2 = Commit::commit("2nd commit", &ignore_files).unwrap();
+        RefValue::create_branch("branch1", &oid1);
+        RefValue::create_branch("branch2", &oid2);
+
+        let mut branches = RefValue::get_refs(".", "refs/heads").unwrap();
+        branches.sort();
+        assert_eq!(branches, vec!["HEAD", "branch1", "branch2"]);
     }
 }

@@ -4,6 +4,7 @@ pub mod entry;
 pub mod reference;
 
 use anyhow::{anyhow, Result};
+use reference::RefValue;
 use std::env;
 use std::fs;
 use std::path::Path;
@@ -20,7 +21,7 @@ enum Commands {
     Commit(String),
     Switch(String),
     Tag((String, Option<String>)),
-    Branch((String, Option<String>)),
+    Branch(Option<(String, Option<String>)>),
     Status,
 }
 
@@ -77,16 +78,18 @@ fn arg_parse() -> Result<Commands> {
                 }
             }
             "branch" => {
-                if args.len() == 3 {
+                if args.len() == 2 {
+                    Commands::Branch(None)
+                } else if args.len() == 3 {
                     let branch_name: String = args[2].to_owned();
-                    Commands::Branch((branch_name, None))
+                    Commands::Branch(Some((branch_name, None)))
                 } else {
-                    let err_msg = "dsgit: `branch` required branch-name, and (option) commit-hash.";
+                    let err_msg = "dsgit: `branch` required branch-name and commit-hash.";
                     check_args(&args, 4, err_msg)?;
 
                     let branch_name: String = args[2].to_owned();
                     let oid: String = args[3].to_owned();
-                    Commands::Branch((branch_name, Some(oid)))
+                    Commands::Branch(Some((branch_name, Some(oid))))
                 }
             }
             "switch" => {
@@ -201,22 +204,37 @@ fn commit(msg: &str, ignore_files: Vec<String>) {
 }
 
 fn switch(commit: &str, ignore_files: Vec<String>) {
-    reference::switch(commit, &ignore_files);
+    RefValue::switch(commit, &ignore_files);
 }
 
 fn create_tag(tag: &str, tag_or_oid: &str) {
     let oid = data::get_oid(tag_or_oid).unwrap();
-    reference::create_tag(tag, &oid);
+    RefValue::create_tag(tag, &oid);
 }
 
-fn branch(name: &str, oid: &str) {
-    reference::create_branch(name, oid);
-    println!("Created a branch: {} at {}", name, oid);
+fn branch(pair_name_oid: Option<(&str, &str)>) {
+    match pair_name_oid {
+        Some((name, oid)) => {
+            RefValue::create_branch(name, oid);
+            println!("Created a branch: {} at {}", name, oid);
+        }
+        None => {
+            let cur_branch = RefValue::get_branch_name().unwrap().unwrap();
+            let branches = RefValue::get_refs(".", "refs/heads/").unwrap();
+            for branch in branches.iter() {
+                if *branch == cur_branch {
+                    println!("* {}", branch);
+                } else {
+                    println!("  {}", branch);
+                }
+            }
+        }
+    }
 }
 
 fn status() {
     let oid = data::get_oid("HEAD").unwrap();
-    match reference::get_branch_name().unwrap() {
+    match RefValue::get_branch_name().unwrap() {
         Some(branch) => println!("On branch {}", branch),
         None => println!("HEAD detached at {}", &oid[10..]),
     }
@@ -274,27 +292,20 @@ fn main() {
         Commands::Tag((tag, oid_or_none)) => {
             let oid = match oid_or_none {
                 Some(oid) => oid,
-                None => {
-                    reference::RefValue::get_ref("HEAD", true)
-                        .unwrap()
-                        .unwrap()
-                        .value
-                }
+                None => RefValue::get_ref("HEAD", true).unwrap().unwrap().value,
             };
             create_tag(&tag, &oid);
         }
-        Commands::Branch((name, oid_or_none)) => {
-            let oid = match oid_or_none {
-                Some(oid) => oid,
-                None => {
-                    reference::RefValue::get_ref("HEAD", true)
-                        .unwrap()
-                        .unwrap()
-                        .value
-                }
-            };
-            branch(&name, &oid);
-        }
+        Commands::Branch(args) => match args {
+            Some((name, oid_or_none)) => {
+                let oid = match oid_or_none {
+                    Some(oid) => oid,
+                    None => RefValue::get_ref("HEAD", true).unwrap().unwrap().value,
+                };
+                branch(Some((&name, &oid)));
+            }
+            None => branch(None),
+        },
         Commands::Status => status(),
     }
 }
