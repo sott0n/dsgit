@@ -26,6 +26,7 @@ enum Commands {
     Branch(Option<(String, Option<String>)>),
     Status,
     Reset(String),
+    Show(Option<String>),
 }
 
 fn check_args(args: &[String], expect_length: usize, err_msg: &'static str) -> Result<()> {
@@ -122,6 +123,15 @@ fn arg_parse() -> Result<Commands> {
                 check_args(&args, 3, err_msg)?;
                 Commands::Reset(args[2].to_owned())
             }
+            "show" => {
+                let err_msg = "dsgit: `show` required commit hash.";
+                if args.len() > 2 {
+                    check_args(&args, 3, err_msg)?;
+                    Commands::Show(Some(args[2].to_owned()))
+                } else {
+                    Commands::Show(None)
+                }
+            }
             _ => {
                 return Err(anyhow!(
                     "dsgit: '{}' is not a dsgit command. See 'dsgit --help'.",
@@ -145,6 +155,19 @@ fn init() {
     );
 }
 
+fn print_commit(oid: &str, commit: &Commit, refs: Option<&str>) {
+    match refs {
+        Some(ref_oid) => println!("commit {:#} based on {:#}", &oid, ref_oid),
+        None => println!("commit {:#}", &oid),
+    }
+    println!("tree   {:#}", &commit.tree);
+    if let Some(parent_oid) = &commit.parent {
+        println!("parent {:#}", parent_oid);
+    }
+    println!("\n{:ident$}{:#}", "", &commit.message, ident = 4);
+    println!();
+}
+
 fn log(tag_or_oid: Option<String>) {
     let mut refs = HashMap::new();
     let ref_values = RefValue::get_refs(None, ".").unwrap();
@@ -163,22 +186,27 @@ fn log(tag_or_oid: Option<String>) {
     loop {
         let commit = Commit::get_commit(&oid).unwrap();
         match refs.get(&oid) {
-            Some(ref_oid) => println!("commit {:#} based on {:#}", &oid, ref_oid.value),
-            None => println!("commit {:#}", &oid),
+            Some(ref_oid) => print_commit(&oid, &commit, Some(&ref_oid.value)),
+            None => print_commit(&oid, &commit, None),
         }
-
-        println!("tree   {:#}", &commit.tree);
-        if let Some(parent_oid) = &commit.parent {
-            println!("parent {:#}", parent_oid);
-        }
-        println!("\n{:ident$}{:#}", "", &commit.message, ident = 4);
-        println!();
-
         oid = match commit.parent {
             Some(oid) => oid,
             None => break,
         }
     }
+}
+
+fn show(oid: Option<String>) {
+    let oid = match oid {
+        Some(oid) => oid,
+        None => match reference::RefValue::get_ref("HEAD", true).unwrap() {
+            Some(ref_value) => ref_value.value,
+            None => return,
+        },
+    };
+
+    let commit = Commit::get_commit(&oid).unwrap();
+    print_commit(&oid, &commit, None);
 }
 
 fn hash_object(file: &str) {
@@ -284,6 +312,7 @@ COMMANDS:
 continue to do work without messing with that main line.
     status                        : Display a current status of version management.
     reset [COMMIT]                : Reset to HEAD from specified commit hash.
+    show [OID]                    : Display a commit object's contents.
 "
     );
     exit(0);
@@ -331,5 +360,6 @@ fn main() {
         },
         Commands::Status => status(),
         Commands::Reset(commit) => reset(&commit),
+        Commands::Show(oid) => show(oid),
     }
 }
