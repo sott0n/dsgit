@@ -85,7 +85,7 @@ impl RefValue {
         }
     }
 
-    pub fn get_refs(prefix: &str, rel_path: &str) -> Result<Vec<String>> {
+    pub fn get_refs(prefix: Option<&str>, rel_path: &str) -> Result<Vec<String>> {
         let mut refs = vec![String::from("HEAD")];
         let prefix_root = format!("{}/{}", DSGIT_DIR, rel_path);
         let prefix_rel_path = Path::new(&prefix_root);
@@ -93,8 +93,13 @@ impl RefValue {
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| !e.file_type().is_dir())
-            .filter(|e| !e.file_name().to_str().unwrap().starts_with(&prefix))
         {
+            if let Some(p) = prefix {
+                let file_name = entry.file_name().to_str().unwrap();
+                if file_name.starts_with(p) {
+                    continue;
+                }
+            }
             let ref_path = entry.path().strip_prefix(prefix_rel_path)?;
             refs.push(ref_path.to_str().unwrap().to_owned());
         }
@@ -272,7 +277,7 @@ mod test {
         RefValue::create_branch("branch1", &oid1);
         RefValue::create_branch("branch2", &oid2);
 
-        let mut branches = RefValue::get_refs(".", "refs/heads").unwrap();
+        let mut branches = RefValue::get_refs(Some("."), "refs/heads").unwrap();
         branches.sort();
         assert_eq!(branches, vec!["HEAD", "branch1", "branch2"]);
     }

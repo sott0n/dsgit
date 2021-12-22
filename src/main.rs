@@ -4,7 +4,9 @@ pub mod entry;
 pub mod reference;
 
 use anyhow::{anyhow, Result};
+use commit::Commit;
 use reference::RefValue;
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::Path;
@@ -138,6 +140,13 @@ fn init() {
 }
 
 fn log(tag_or_oid: Option<String>) {
+    let mut refs = HashMap::new();
+    let ref_values = RefValue::get_refs(None, ".").unwrap();
+    for r in ref_values.iter() {
+        dbg!(r);
+        refs.insert(r, RefValue::get_ref(r, true).unwrap().unwrap());
+    }
+
     let mut oid = match tag_or_oid {
         Some(tag_or_oid) => data::get_oid(&tag_or_oid).unwrap(),
         None => match reference::RefValue::get_ref("HEAD", true).unwrap() {
@@ -147,8 +156,12 @@ fn log(tag_or_oid: Option<String>) {
     };
 
     loop {
-        let commit = commit::Commit::get_commit(&oid).unwrap();
-        println!("commit {:#}", &oid);
+        let commit = Commit::get_commit(&oid).unwrap();
+        match refs.get(&oid) {
+            Some(ref_oid) => println!("commit {:#} based on {:#}", &oid, ref_oid.value),
+            None => println!("commit {:#}", &oid),
+        }
+
         println!("tree   {:#}", &commit.tree);
         if let Some(parent_oid) = &commit.parent {
             println!("parent {:#}", parent_oid);
@@ -199,7 +212,7 @@ fn read_ignore_file() -> Vec<String> {
 }
 
 fn commit(msg: &str, ignore_files: Vec<String>) {
-    let oid = commit::Commit::commit(msg, &ignore_files).unwrap();
+    let oid = Commit::commit(msg, &ignore_files).unwrap();
     println!("{:#}", oid);
 }
 
@@ -220,7 +233,7 @@ fn branch(pair_name_oid: Option<(&str, &str)>) {
         }
         None => {
             let cur_branch = RefValue::get_branch_name().unwrap().unwrap();
-            let branches = RefValue::get_refs(".", "refs/heads/").unwrap();
+            let branches = RefValue::get_refs(Some("."), "refs/heads/").unwrap();
             for branch in branches.iter() {
                 if *branch == cur_branch {
                     println!("* {}", branch);
