@@ -255,21 +255,20 @@ mod test {
     fn test_write_tree() {
         setup();
         let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
-        if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
-            let expect_result = test_data(""); // Not need spefify os in linux or macos case.
+        if cfg!(target_os = "windows") {
+            let expect_result = test_data("windows");
             let oid = Tree::write_tree(TARGET_PATH, ignore_files).unwrap();
-            assert_eq!(oid, "758e8e0c0eae49610531a22c1778e10baece4415");
+            assert_eq!(oid, "e64d4dd00d39e3f8f76337cbe3bab51a48d70708");
 
             let obj = get_object(&oid, TypeObject::Tree).unwrap();
             for (i, line) in obj.lines().enumerate() {
                 let entry = Entry::from(line);
                 assert_eq!(entry, expect_result[i]);
             }
-        }
-        if cfg!(target_os = "windows") {
-            let expect_result = test_data("windows");
+        } else {
+            let expect_result = test_data(""); // Not need spefify os in linux or macos case.
             let oid = Tree::write_tree(TARGET_PATH, ignore_files).unwrap();
-            assert_eq!(oid, "e64d4dd00d39e3f8f76337cbe3bab51a48d70708");
+            assert_eq!(oid, "758e8e0c0eae49610531a22c1778e10baece4415");
 
             let obj = get_object(&oid, TypeObject::Tree).unwrap();
             for (i, line) in obj.lines().enumerate() {
@@ -307,11 +306,10 @@ mod test {
             PathBuf::from("./tests/other"),
         ];
         setup();
-        if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
-            assert_read_tree("758e8e0c0eae49610531a22c1778e10baece4415", &expect_paths);
-        }
         if cfg!(target_os = "windows") {
             assert_read_tree("e64d4dd00d39e3f8f76337cbe3bab51a48d70708", &expect_paths);
+        } else {
+            assert_read_tree("758e8e0c0eae49610531a22c1778e10baece4415", &expect_paths);
         }
     }
 }

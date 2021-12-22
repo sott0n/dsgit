@@ -98,11 +98,10 @@ mod test {
         // First commit, not include parent hash.
         let got_first_oid: String = Commit::commit("test", &ignore_files).unwrap().to_string();
 
-        if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
-            assert_eq!(&got_first_oid, "7679dce8118ba45c0e0698845d71db172b350852");
-        }
         if cfg!(target_os = "windows") {
             assert_eq!(&got_first_oid, "aaad0be6d821d5398420eaad5f385892d6727df2");
+        } else {
+            assert_eq!(&got_first_oid, "7679dce8118ba45c0e0698845d71db172b350852");
         }
         let obj: String = get_object(&got_first_oid, TypeObject::Commit).unwrap();
         let contents: Vec<&str> = obj.lines().collect();
@@ -113,11 +112,10 @@ mod test {
             .unwrap()
             .to_string();
 
-        if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
-            assert_eq!(&got_second_oid, "6605e946039f5c20e9af1972736a3ecd012fe095");
-        }
         if cfg!(target_os = "windows") {
             assert_eq!(&got_second_oid, "36c824b68b40b8c054d9d82c424db2e37ff8c628");
+        } else {
+            assert_eq!(&got_second_oid, "6605e946039f5c20e9af1972736a3ecd012fe095");
         }
         let obj: String = get_object(&got_second_oid, TypeObject::Commit).unwrap();
         let contents: Vec<&str> = obj.lines().collect();

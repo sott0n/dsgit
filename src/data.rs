@@ -199,13 +199,12 @@ mod test {
             let contents = fs::read_to_string(f.0).unwrap();
             let hash = hash_object(&contents, TypeObject::Blob).unwrap();
 
-            if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
-                assert_eq!(hash, f.1);
-                assert!(Path::new(&format!("{}/objects/{}", DSGIT_DIR, f.1)).exists());
-            }
             if cfg!(target_os = "windows") {
                 assert_eq!(hash, f.3);
                 assert!(Path::new(&format!("{}/objects/{}", DSGIT_DIR, f.3)).exists());
+            } else {
+                assert_eq!(hash, f.1);
+                assert!(Path::new(&format!("{}/objects/{}", DSGIT_DIR, f.1)).exists());
             }
         }
     }
@@ -219,11 +218,10 @@ mod test {
             let hash = hash_object(&contents, TypeObject::Blob).unwrap();
             let obj = get_object(&hash, TypeObject::Blob).unwrap();
 
-            if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
-                assert_eq!(obj, f.2);
-            }
             if cfg!(target_os = "windows") {
                 assert_eq!(obj, f.4);
+            } else {
+                assert_eq!(obj, f.2);
             }
         }
     }
