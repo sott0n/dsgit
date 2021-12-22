@@ -4,13 +4,16 @@
 
 A toy version management system written in Rust.
 
+## How to build
+
+```
+❯ 🍻 cargo build --release
+```
+
 ## How to run
 
 ```
-❯ 🍻 cargo run -- --help
-   Compiling dsgit v0.1.0 (/Users/sott0n/workspace/dsgit)
-    Finished dev [unoptimized + debuginfo] target(s) in 0.61s
-     Running `target/debug/dsgit --help`
+❯ 🍻 ./target/release/dsgit --help
 dsgit: A toy version management system written in Rust.
 
 USAGE:
@@ -27,6 +30,9 @@ COMMANDS:
     switch [COMMIT]               : Switch branch or restore working tree's files.
     tag [TAG NAME] [COMMIT]       : Set a mark to commit hash.
     branch [BRANCH NAME] [COMMIT] : Diverge from the main line of development and continue to do work without messing with that main line.
+    status                        : Display a current status of version management.
+    reset [COMMIT]                : Reset to HEAD from specified commit hash.
+    show [OID]                    : Display a commit object's contents.
 ```
 
 ## How to test
@@ -34,3 +40,6 @@ COMMANDS:
 ```
 ❯ 🍻 make test
 ```
+
+## Acknowledgements
+This toy project based on [ugit](https://www.leshenko.net/p/ugit/).
