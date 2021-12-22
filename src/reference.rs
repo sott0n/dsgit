@@ -296,8 +296,15 @@ mod test {
         let _ = Commit::commit("2nd commit", &ignore_files).unwrap();
 
         let head_path = format!("{}/HEAD", DSGIT_DIR);
-        let expect_val = "957df5375eb8a1ca3928e0a056aeb70fe7e8b1b7".to_owned();
+
         reset(&oid1);
-        assert_file_contents(&head_path, vec![expect_val]);
+        if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
+            let expect_val = "957df5375eb8a1ca3928e0a056aeb70fe7e8b1b7".to_owned();
+            assert_file_contents(&head_path, vec![expect_val]);
+        }
+        if cfg!(target_os = "windows") {
+            let expect_val = "a19819c9a9d9abe6eb01059bcc1e096882df48ae".to_owned();
+            assert_file_contents(&head_path, vec![expect_val]);
+        }
     }
 }
