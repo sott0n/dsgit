@@ -148,17 +148,22 @@ impl RefValue {
             .to_owned();
         Ok(Some(rel_path))
     }
+}
 
-    pub fn create_tag(tag: &str, oid: &str) {
-        let ref_value = RefValue::new(Some(oid), false, oid);
-        RefValue::update_ref(&format!("refs/tags/{}", tag), &ref_value, true).unwrap();
-    }
+pub fn create_tag(tag: &str, oid: &str) {
+    let ref_value = RefValue::new(Some(oid), false, oid);
+    RefValue::update_ref(&format!("refs/tags/{}", tag), &ref_value, true).unwrap();
+}
 
-    pub fn create_branch(name: &str, oid: &str) {
-        let ref_name = String::from("refs/heads/") + name;
-        let ref_value = RefValue::new(Some(oid), false, oid);
-        RefValue::update_ref(&ref_name, &ref_value, true).unwrap();
-    }
+pub fn create_branch(name: &str, oid: &str) {
+    let ref_name = String::from("refs/heads/") + name;
+    let ref_value = RefValue::new(Some(oid), false, oid);
+    RefValue::update_ref(&ref_name, &ref_value, true).unwrap();
+}
+
+pub fn reset(commit: &str) {
+    let ref_value = RefValue::new(Some(commit), false, commit);
+    RefValue::update_ref("HEAD", &ref_value, true).unwrap();
 }
 
 #[cfg(test)]
@@ -222,7 +227,7 @@ mod test {
         assert_number_files("./tests", 4);
 
         // Switch branch.
-        RefValue::create_branch("branch1", &oid1);
+        create_branch("branch1", &oid1);
         RefValue::switch("branch1", &ignore_files);
         let head_path = format!("{}/HEAD", DSGIT_DIR);
         let expect_val = "ref:refs/heads/branch1".to_string();
@@ -237,12 +242,12 @@ mod test {
         let oid1 = Commit::commit("1st commit", &ignore_files).unwrap();
         let oid2 = Commit::commit("2nd commit", &ignore_files).unwrap();
 
-        RefValue::create_tag("tag1", &oid1);
+        create_tag("tag1", &oid1);
         let f1_path = format!("{}/refs/tags/tag1", DSGIT_DIR);
         assert!(Path::new(&f1_path).exists());
         assert_file_contents(&f1_path, vec![oid1]);
 
-        RefValue::create_tag("tag2", &oid2);
+        create_tag("tag2", &oid2);
         let f2_path = format!("{}/refs/tags/tag2", DSGIT_DIR);
         assert!(Path::new(&f2_path).exists());
         assert_file_contents(&f2_path, vec![oid2]);
@@ -256,12 +261,12 @@ mod test {
         let oid1 = Commit::commit("1st commit", &ignore_files).unwrap();
         let oid2 = Commit::commit("2nd commit", &ignore_files).unwrap();
 
-        RefValue::create_branch("branch1", &oid1);
+        create_branch("branch1", &oid1);
         let b1_path = format!("{}/refs/heads/branch1", DSGIT_DIR);
         assert!(Path::new(&b1_path).exists());
         assert_file_contents(&b1_path, vec![oid1]);
 
-        RefValue::create_branch("branch2", &oid2);
+        create_branch("branch2", &oid2);
         let b2_path = format!("{}/refs/heads/branch2", DSGIT_DIR);
         assert!(Path::new(&b2_path).exists());
         assert_file_contents(&b2_path, vec![oid2]);
@@ -274,11 +279,25 @@ mod test {
         let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
         let oid1 = Commit::commit("1st commit", &ignore_files).unwrap();
         let oid2 = Commit::commit("2nd commit", &ignore_files).unwrap();
-        RefValue::create_branch("branch1", &oid1);
-        RefValue::create_branch("branch2", &oid2);
+        create_branch("branch1", &oid1);
+        create_branch("branch2", &oid2);
 
         let mut branches = RefValue::get_refs(Some("."), "refs/heads").unwrap();
         branches.sort();
         assert_eq!(branches, vec!["HEAD", "branch1", "branch2"]);
+    }
+
+    #[test]
+    #[serial]
+    fn test_reset() {
+        setup();
+        let ignore_files: &[String] = &IGNORE_FILES.map(|f| f.to_string());
+        let oid1 = Commit::commit("1st commit", &ignore_files).unwrap();
+        let _ = Commit::commit("2nd commit", &ignore_files).unwrap();
+
+        let head_path = format!("{}/HEAD", DSGIT_DIR);
+        let expect_val = "957df5375eb8a1ca3928e0a056aeb70fe7e8b1b7".to_owned();
+        reset(&oid1);
+        assert_file_contents(&head_path, vec![expect_val]);
     }
 }

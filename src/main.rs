@@ -25,6 +25,7 @@ enum Commands {
     Tag((String, Option<String>)),
     Branch(Option<(String, Option<String>)>),
     Status,
+    Reset(String),
 }
 
 fn check_args(args: &[String], expect_length: usize, err_msg: &'static str) -> Result<()> {
@@ -116,6 +117,11 @@ fn arg_parse() -> Result<Commands> {
                 }
             }
             "status" => Commands::Status,
+            "reset" => {
+                let err_msg = "dsgit: `reset` required commit-hash.";
+                check_args(&args, 3, err_msg)?;
+                Commands::Reset(args[2].to_owned())
+            }
             _ => {
                 return Err(anyhow!(
                     "dsgit: '{}' is not a dsgit command. See 'dsgit --help'.",
@@ -143,7 +149,6 @@ fn log(tag_or_oid: Option<String>) {
     let mut refs = HashMap::new();
     let ref_values = RefValue::get_refs(None, ".").unwrap();
     for r in ref_values.iter() {
-        dbg!(r);
         refs.insert(r, RefValue::get_ref(r, true).unwrap().unwrap());
     }
 
@@ -222,13 +227,13 @@ fn switch(commit: &str, ignore_files: Vec<String>) {
 
 fn create_tag(tag: &str, tag_or_oid: &str) {
     let oid = data::get_oid(tag_or_oid).unwrap();
-    RefValue::create_tag(tag, &oid);
+    reference::create_tag(tag, &oid);
 }
 
 fn branch(pair_name_oid: Option<(&str, &str)>) {
     match pair_name_oid {
         Some((name, oid)) => {
-            RefValue::create_branch(name, oid);
+            reference::create_branch(name, oid);
             println!("Created a branch: {} at {}", name, oid);
         }
         None => {
@@ -253,6 +258,10 @@ fn status() {
     }
 }
 
+fn reset(commit: &str) {
+    reference::reset(commit);
+}
+
 fn help() {
     println!(
         "\
@@ -274,6 +283,7 @@ COMMANDS:
     branch [BRANCH NAME] [COMMIT] : Diverge from the main line of development and \
 continue to do work without messing with that main line.
     status                        : Display a current status of version management.
+    reset [COMMIT]                : Reset to HEAD from specified commit hash.
 "
     );
     exit(0);
@@ -320,5 +330,6 @@ fn main() {
             None => branch(None),
         },
         Commands::Status => status(),
+        Commands::Reset(commit) => reset(&commit),
     }
 }
