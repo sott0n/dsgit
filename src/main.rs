@@ -213,14 +213,11 @@ fn show(oid: Option<String>) {
         let parent = Commit::get_commit(&oid).unwrap();
         let from_tree = data::get_object(&parent.tree, data::TypeObject::Tree).unwrap();
         let to_tree = data::get_object(&commit.tree, data::TypeObject::Tree).unwrap();
-        let diff_paths = diff::diff_trees(
+        diff::diff_trees(
             entry::Tree::get_tree(&from_tree).unwrap(),
             entry::Tree::get_tree(&to_tree).unwrap(),
-        );
-
-        for path in diff_paths.iter() {
-            println!("changed: {}", path);
-        }
+        )
+        .unwrap();
     };
 }
 
