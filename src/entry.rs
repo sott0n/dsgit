@@ -8,9 +8,9 @@ use std::str::FromStr;
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Entry {
-    path: String,
-    oid: String,
-    obj_type: TypeObject,
+    pub path: String,
+    pub oid: String,
+    pub obj_type: TypeObject,
 }
 
 impl fmt::Display for Entry {
@@ -23,12 +23,11 @@ impl From<&str> for Entry {
     fn from(item: &str) -> Entry {
         let entry: Vec<&str> = item.split(' ').collect();
         if entry.len() != 3 {
-            anyhow!(
+            panic!(
                 "Entry must be length == 3, but this length got {}",
                 entry.len()
             );
         }
-
         Entry {
             path: entry[2].to_owned(),
             oid: entry[1].to_owned(),
@@ -39,7 +38,7 @@ impl From<&str> for Entry {
 
 #[derive(Debug)]
 pub struct Tree {
-    entries: Vec<Entry>,
+    pub entries: Vec<Entry>,
 }
 
 impl Tree {
@@ -124,7 +123,7 @@ impl Tree {
         }
     }
 
-    fn get_tree(tree: &str) -> Result<Self> {
+    pub fn get_tree(tree: &str) -> Result<Self> {
         let mut entries = vec![];
 
         for line in tree.lines() {

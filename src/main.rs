@@ -1,5 +1,6 @@
 pub mod commit;
 pub mod data;
+pub mod diff;
 pub mod entry;
 pub mod reference;
 
@@ -207,6 +208,20 @@ fn show(oid: Option<String>) {
 
     let commit = Commit::get_commit(&oid).unwrap();
     print_commit(&oid, &commit, None);
+
+    if let Some(oid) = commit.parent {
+        let parent = Commit::get_commit(&oid).unwrap();
+        let from_tree = data::get_object(&parent.tree, data::TypeObject::Tree).unwrap();
+        let to_tree = data::get_object(&commit.tree, data::TypeObject::Tree).unwrap();
+        let diff_paths = diff::diff_trees(
+            entry::Tree::get_tree(&from_tree).unwrap(),
+            entry::Tree::get_tree(&to_tree).unwrap(),
+        );
+
+        for path in diff_paths.iter() {
+            println!("changed: {}", path);
+        }
+    };
 }
 
 fn hash_object(file: &str) {
