@@ -8,15 +8,15 @@ use anyhow::Result;
 use console::{style, Style};
 use similar::{ChangeTag, TextDiff};
 
-pub fn diff_trees(from: Tree, to: Tree) -> Result<Vec<String>> {
-    fn convert_dict(tree: Tree) -> HashMap<String, String> {
-        let mut tree_dict: HashMap<String, String> = HashMap::new();
-        for entry in tree.entries.iter() {
-            tree_dict.insert(entry.path.to_owned(), entry.oid.to_owned());
-        }
-        tree_dict
+fn convert_dict(tree: Tree) -> HashMap<String, String> {
+    let mut tree_dict: HashMap<String, String> = HashMap::new();
+    for entry in tree.entries.iter() {
+        tree_dict.insert(entry.path.to_owned(), entry.oid.to_owned());
     }
+    tree_dict
+}
 
+pub fn diff_trees(from: Tree, to: Tree) -> Result<Vec<String>> {
     let from_tree = convert_dict(from);
     let to_tree = convert_dict(to);
 
@@ -113,55 +113,24 @@ fn display_diff_file(old_oid: Option<&str>, new_oid: Option<&str>) -> Result<()>
     Ok(())
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::data::TypeObject;
-    use crate::entry::{Entry, Tree};
-
-    #[test]
-    fn test_diff_trees() {
-        let from_tree = Tree {
-            entries: vec![
-                Entry {
-                    path: "test_a".to_string(),
-                    oid: "1111".to_string(),
-                    obj_type: TypeObject::Blob,
-                },
-                Entry {
-                    path: "test_b".to_string(),
-                    oid: "2222".to_string(),
-                    obj_type: TypeObject::Blob,
-                },
-                Entry {
-                    path: "test_c".to_string(),
-                    oid: "3333".to_string(),
-                    obj_type: TypeObject::Blob,
-                },
-            ],
-        };
-        let to_tree = Tree {
-            entries: vec![
-                Entry {
-                    path: "test_a".to_string(),
-                    oid: "1111".to_string(),
-                    obj_type: TypeObject::Blob,
-                },
-                Entry {
-                    path: "test_d".to_string(),
-                    oid: "4444".to_string(),
-                    obj_type: TypeObject::Blob,
-                },
-                Entry {
-                    path: "test_c".to_string(),
-                    oid: "3333".to_string(),
-                    obj_type: TypeObject::Blob,
-                },
-            ],
-        };
-
-        let mut trees = diff_trees(from_tree, to_tree);
-        trees.sort();
-        assert_eq!(trees, vec!["test_b", "test_d"]);
-    }
-}
+// TODO Move all tests to test directory..
+//#[cfg(test)]
+//mod test {
+//    use super::*;
+//    use crate::data::hash_object;
+//    use crate::entry::{Entry, Tree};
+//    use std::fs;
+//    use tempfile::NamedTempFile;
+//
+//    #[test]
+//    fn test_diff_trees() {
+//        let temp_f = NamedTempFile::new();
+//
+//        let contents = fs::read_to_string("./tests/hello.txt").unwrap();
+//        let hash = hash_object(&contents, TypeObject::Blob).unwrap();
+//
+//        let mut trees = diff_trees(from_tree, to_tree).unwrap();
+//        trees.sort();
+//        assert_eq!(trees, vec!["test_b", "test_d"]);
+//    }
+//}

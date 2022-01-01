@@ -4,14 +4,17 @@ pub mod diff;
 pub mod entry;
 pub mod reference;
 
-use anyhow::{anyhow, Result};
-use commit::Commit;
-use reference::RefValue;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::Path;
 use std::process::exit;
+
+use anyhow::{anyhow, Result};
+use commit::Commit;
+use data::TypeObject;
+use entry::Tree;
+use reference::RefValue;
 
 enum Commands {
     Help,
@@ -28,6 +31,7 @@ enum Commands {
     Status,
     Reset(String),
     Show(Option<String>),
+    Diff(Option<String>),
 }
 
 fn check_args(args: &[String], expect_length: usize, err_msg: &'static str) -> Result<()> {
@@ -133,6 +137,15 @@ fn arg_parse() -> Result<Commands> {
                     Commands::Show(None)
                 }
             }
+            "diff" => {
+                let err_msg = "dsgit: `diff` required commit hash.";
+                if args.len() > 2 {
+                    check_args(&args, 3, err_msg)?;
+                    Commands::Diff(Some(args[2].to_owned()))
+                } else {
+                    Commands::Diff(None)
+                }
+            }
             _ => {
                 return Err(anyhow!(
                     "dsgit: '{}' is not a dsgit command. See 'dsgit --help'.",
@@ -200,7 +213,7 @@ fn log(tag_or_oid: Option<String>) {
 fn show(oid: Option<String>) {
     let oid = match oid {
         Some(oid) => oid,
-        None => match reference::RefValue::get_ref("HEAD", true).unwrap() {
+        None => match RefValue::get_ref("HEAD", true).unwrap() {
             Some(ref_value) => ref_value.value,
             None => return,
         },
@@ -214,11 +227,31 @@ fn show(oid: Option<String>) {
         let from_tree = data::get_object(&parent.tree, data::TypeObject::Tree).unwrap();
         let to_tree = data::get_object(&commit.tree, data::TypeObject::Tree).unwrap();
         diff::diff_trees(
-            entry::Tree::get_tree(&from_tree).unwrap(),
-            entry::Tree::get_tree(&to_tree).unwrap(),
+            Tree::get_tree(&from_tree).unwrap(),
+            Tree::get_tree(&to_tree).unwrap(),
         )
         .unwrap();
     };
+}
+
+fn diff(oid: Option<String>) {
+    let ignore_files = read_ignore_file();
+    let oid = match oid {
+        Some(oid) => oid,
+        None => match RefValue::get_ref("HEAD", true).unwrap() {
+            Some(ref_value) => ref_value.value,
+            None => return,
+        },
+    };
+    let pre_commit = Commit::get_commit(&oid).unwrap();
+    let pre_tree = data::get_object(&pre_commit.tree, TypeObject::Tree).unwrap();
+
+    // Diff between working tree and difference specified commit /or HEAD tree.
+    diff::diff_trees(
+        Tree::get_tree(&pre_tree).unwrap(),
+        Tree::get_working_tree(&ignore_files).unwrap(),
+    )
+    .unwrap();
 }
 
 fn hash_object(file: &str) {
@@ -314,7 +347,7 @@ COMMANDS:
     --help | -h                   : Show this help.
     init                          : Initialize dsgit, creating `.dsgit` directory.
     hash-object [FILE NAME]       : Given file, calculate hash object.
-    cat-object [FILE NAME]        : Given object id, display object's contents.
+    cat-object [OID]              : Given object id, display object's contents.
     read-tree [OID]               : Read a tree objects from specified tree oid.
     write-tree                    : Write a tree objects structure into .dsgit.
     commit [MESSAGE]              : Record changes to the repository.
@@ -324,7 +357,8 @@ COMMANDS:
 continue to do work without messing with that main line.
     status                        : Display a current status of version management.
     reset [COMMIT]                : Reset to HEAD from specified commit hash.
-    show [OID]                    : Display a commit object's contents.
+    show [COMMIT]                 : Display a commit object's contents.
+    diff [COMMIT]                 : Display a difference between working tree and specified commit tree.
 "
     );
     exit(0);
@@ -373,5 +407,6 @@ fn main() {
         Commands::Status => status(),
         Commands::Reset(commit) => reset(&commit),
         Commands::Show(oid) => show(oid),
+        Commands::Diff(oid) => diff(oid),
     }
 }

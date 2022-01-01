@@ -42,18 +42,46 @@ pub struct Tree {
 }
 
 impl Tree {
+    pub fn new(target_path: &str, ignore_options: &[String]) -> Result<Self> {
+        let mut entries: Vec<Entry> = vec![];
+        for entry in fs::read_dir(target_path)
+            .with_context(|| format!("Failed to read directory: {}", target_path))?
+        {
+            let path = entry.unwrap().path();
+            if Tree::is_ignored(path.to_str().unwrap(), ignore_options) {
+                continue;
+            }
+
+            let metadata = fs::symlink_metadata(&path).unwrap();
+            if metadata.is_file() {
+                let contents = fs::read_to_string(&path).unwrap();
+                let oid = hash_object(&contents, TypeObject::Blob).unwrap();
+                entries.push(Entry {
+                    path: path.to_str().unwrap().to_string(),
+                    oid: oid.to_string(),
+                    obj_type: TypeObject::Blob,
+                })
+            }
+            if metadata.is_dir() {
+                let mut tmp_tree = Tree::new(path.to_str().unwrap(), ignore_options)?;
+                entries.append(&mut tmp_tree.entries);
+            }
+        }
+
+        Ok(Tree { entries })
+    }
+
     pub fn write_tree(target_path: &str, ignore_options: &[String]) -> Result<String> {
         let mut entries: Vec<Entry> = vec![];
         for entry in fs::read_dir(target_path)
             .with_context(|| format!("Failed to read directory: {}", target_path))?
         {
             let path = entry.unwrap().path();
-
             if Tree::is_ignored(path.to_str().unwrap(), ignore_options) {
                 continue;
             }
-            let metadata = fs::symlink_metadata(&path).unwrap();
 
+            let metadata = fs::symlink_metadata(&path).unwrap();
             if metadata.is_file() {
                 let contents = fs::read_to_string(&path).unwrap();
                 let oid = hash_object(&contents, TypeObject::Blob).unwrap();
@@ -73,13 +101,13 @@ impl Tree {
             }
         }
 
-        let mut tree = String::new();
         entries.sort();
+        let mut tree_contents = String::new();
         for entry in entries.iter() {
-            tree = tree + &entry.to_string();
+            tree_contents = tree_contents + &entry.to_string();
         }
 
-        let hash_tree = hash_object(&tree, TypeObject::Tree).unwrap();
+        let hash_tree = hash_object(&tree_contents, TypeObject::Tree).unwrap();
         Ok(hash_tree)
     }
 
@@ -141,6 +169,10 @@ impl Tree {
             }
         }
         Ok(Tree { entries })
+    }
+
+    pub fn get_working_tree(ignore_options: &[String]) -> Result<Tree> {
+        Tree::new(".", ignore_options)
     }
 
     fn is_ignored(path: &str, ignore_options: &[String]) -> bool {
