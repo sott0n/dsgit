@@ -16,7 +16,7 @@ fn convert_dict(tree: Tree) -> HashMap<String, String> {
     tree_dict
 }
 
-pub fn diff_trees(from: Tree, to: Tree) -> Result<Vec<String>> {
+pub fn diff_trees(from: Tree, to: Tree) -> Result<(Vec<String>, Vec<String>, Vec<String>)> {
     let from_tree = convert_dict(from);
     let to_tree = convert_dict(to);
 
@@ -26,7 +26,9 @@ pub fn diff_trees(from: Tree, to: Tree) -> Result<Vec<String>> {
     paths.append(&mut to_paths);
     let uniq_paths: HashSet<String> = paths.iter().cloned().collect();
 
-    let mut diff_entries: Vec<String> = vec![];
+    let mut changed_entries: Vec<String> = vec![];
+    let mut created_entries: Vec<String> = vec![];
+    let mut removed_entries: Vec<String> = vec![];
     for path in uniq_paths.iter() {
         match &from_tree.get(path) {
             Some(from_oid) => match &to_tree.get(path) {
@@ -34,27 +36,27 @@ pub fn diff_trees(from: Tree, to: Tree) -> Result<Vec<String>> {
                     if from_oid != to_oid {
                         println!("Changed: {}", path);
                         display_diff_file(Some(from_oid), Some(to_oid))?;
-                        diff_entries.push(path.to_owned());
+                        changed_entries.push(path.to_owned());
                     }
                 }
                 None => {
                     println!("Removed: {}", path);
                     display_diff_file(Some(from_oid), None)?;
-                    diff_entries.push(path.to_owned());
+                    removed_entries.push(path.to_owned());
                 }
             },
             None => match &to_tree.get(path) {
                 Some(to_oid) => {
                     println!("Created: {}", path);
                     display_diff_file(None, Some(to_oid))?;
-                    diff_entries.push(path.to_owned());
+                    created_entries.push(path.to_owned());
                 }
                 None => continue,
             },
         }
     }
 
-    Ok(diff_entries)
+    Ok((changed_entries, created_entries, removed_entries))
 }
 
 struct Line(Option<usize>);
@@ -112,25 +114,3 @@ fn display_diff_file(old_oid: Option<&str>, new_oid: Option<&str>) -> Result<()>
 
     Ok(())
 }
-
-// TODO Move all tests to test directory..
-//#[cfg(test)]
-//mod test {
-//    use super::*;
-//    use crate::data::hash_object;
-//    use crate::entry::{Entry, Tree};
-//    use std::fs;
-//    use tempfile::NamedTempFile;
-//
-//    #[test]
-//    fn test_diff_trees() {
-//        let temp_f = NamedTempFile::new();
-//
-//        let contents = fs::read_to_string("./tests/hello.txt").unwrap();
-//        let hash = hash_object(&contents, TypeObject::Blob).unwrap();
-//
-//        let mut trees = diff_trees(from_tree, to_tree).unwrap();
-//        trees.sort();
-//        assert_eq!(trees, vec!["test_b", "test_d"]);
-//    }
-//}

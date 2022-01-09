@@ -142,8 +142,9 @@ impl Tree {
             let mut file = fs::OpenOptions::new()
                 .write(true)
                 .create(true)
+                .truncate(true)
                 .open(&entry.path)
-                .with_context(|| format!("Failed to read tree: {}", &entry.path))
+                .with_context(|| format!("Failed to access file: {}", &entry.path))
                 .unwrap();
 
             file.write_all(get_object(&entry.oid, TypeObject::Blob).unwrap().as_bytes())
