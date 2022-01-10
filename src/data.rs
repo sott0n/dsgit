@@ -72,7 +72,7 @@ pub fn hash_object(data: &str, type_obj: TypeObject) -> Result<String> {
         .open(format!("{}/objects/{}", DSGIT_DIR, oid))
         .with_context(|| format!("Failed to open object file: objects/{}", oid))?;
 
-    file.write_all(obj.as_bytes()).unwrap();
+    file.write_all(obj.as_bytes())?;
     Ok(oid)
 }
 

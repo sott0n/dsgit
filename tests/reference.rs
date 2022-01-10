@@ -31,12 +31,12 @@ fn switch() {
     assert_number_files(6);
 
     // Switch `1st commit` hash.
-    RefValue::switch(&oid1, &[]);
+    RefValue::switch(&oid1, &[]).unwrap();
     assert_number_files(5);
 
     // Switch branch.
     reference::create_branch("branch1", &oid1);
-    RefValue::switch("branch1", &[]);
+    RefValue::switch("branch1", &[]).unwrap();
     let head_path = format!("{}/HEAD", DSGIT_DIR);
     let expect_val = "ref:refs/heads/branch1".to_string();
     assert_file_contents(&head_path, vec![expect_val]);

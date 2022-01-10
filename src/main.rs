@@ -268,7 +268,7 @@ fn cat_object(tag_or_oid: &str) {
 
 fn read_tree(tag_or_oid: &str, ignore_files: Vec<String>) {
     let oid = data::get_oid(tag_or_oid).unwrap();
-    entry::Tree::read_tree(&oid, &ignore_files);
+    entry::Tree::read_tree(&oid, &ignore_files).unwrap();
 }
 
 fn write_tree(ignore_files: Vec<String>) {
@@ -295,7 +295,7 @@ fn commit(msg: &str, ignore_files: Vec<String>) {
 }
 
 fn switch(commit: &str, ignore_files: Vec<String>) {
-    RefValue::switch(commit, &ignore_files);
+    RefValue::switch(commit, &ignore_files).unwrap();
 }
 
 fn create_tag(tag: &str, tag_or_oid: &str) {

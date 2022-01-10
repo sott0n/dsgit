@@ -109,7 +109,7 @@ fn read_tree() {
         let paths = fs::read_dir(".").unwrap();
         assert_eq!(paths.count(), 4);
 
-        Tree::read_tree(&oid, &[]);
+        Tree::read_tree(&oid, &[]).unwrap();
         let paths = fs::read_dir(".").unwrap();
         let got_paths = paths
             .map(|res| res.map(|e| e.path()))

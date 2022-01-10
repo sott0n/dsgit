@@ -107,10 +107,10 @@ impl RefValue {
         Ok(refs)
     }
 
-    pub fn switch(name: &str, ignore_options: &[String]) {
+    pub fn switch(name: &str, ignore_options: &[String]) -> Result<()> {
         let oid = get_oid(name).unwrap();
         let commit = Commit::get_commit(&oid).unwrap();
-        Tree::read_tree(&commit.tree, ignore_options);
+        Tree::read_tree(&commit.tree, ignore_options)?;
 
         let head_ref = if RefValue::is_branch(name) {
             let value = String::from("refs/heads/") + name;
@@ -120,6 +120,7 @@ impl RefValue {
         };
 
         RefValue::update_ref("HEAD", &head_ref, false).unwrap();
+        Ok(())
     }
 
     fn is_branch(name: &str) -> bool {

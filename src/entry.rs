@@ -47,15 +47,15 @@ impl Tree {
         for entry in fs::read_dir(target_path)
             .with_context(|| format!("Failed to read directory: {}", target_path))?
         {
-            let path = entry.unwrap().path();
+            let path = entry?.path();
             if Tree::is_ignored(path.to_str().unwrap(), ignore_options) {
                 continue;
             }
 
-            let metadata = fs::symlink_metadata(&path).unwrap();
+            let metadata = fs::symlink_metadata(&path)?;
             if metadata.is_file() {
-                let contents = fs::read_to_string(&path).unwrap();
-                let oid = hash_object(&contents, TypeObject::Blob).unwrap();
+                let contents = fs::read_to_string(&path)?;
+                let oid = hash_object(&contents, TypeObject::Blob)?;
                 entries.push(Entry {
                     path: path.to_str().unwrap().to_string(),
                     oid: oid.to_string(),
@@ -76,15 +76,15 @@ impl Tree {
         for entry in fs::read_dir(target_path)
             .with_context(|| format!("Failed to read directory: {}", target_path))?
         {
-            let path = entry.unwrap().path();
+            let path = entry?.path();
             if Tree::is_ignored(path.to_str().unwrap(), ignore_options) {
                 continue;
             }
 
-            let metadata = fs::symlink_metadata(&path).unwrap();
+            let metadata = fs::symlink_metadata(&path)?;
             if metadata.is_file() {
-                let contents = fs::read_to_string(&path).unwrap();
-                let oid = hash_object(&contents, TypeObject::Blob).unwrap();
+                let contents = fs::read_to_string(&path)?;
+                let oid = hash_object(&contents, TypeObject::Blob)?;
                 entries.push(Entry {
                     path: path.to_str().unwrap().to_string(),
                     oid: oid.to_string(),
@@ -92,7 +92,7 @@ impl Tree {
                 })
             }
             if metadata.is_dir() {
-                let oid = Tree::write_tree(path.to_str().unwrap(), ignore_options).unwrap();
+                let oid = Tree::write_tree(path.to_str().unwrap(), ignore_options)?;
                 entries.push(Entry {
                     path: path.to_str().unwrap().to_string(),
                     oid: oid.to_string(),
@@ -107,49 +107,49 @@ impl Tree {
             tree_contents = tree_contents + &entry.to_string();
         }
 
-        let hash_tree = hash_object(&tree_contents, TypeObject::Tree).unwrap();
+        let hash_tree = hash_object(&tree_contents, TypeObject::Tree)?;
         Ok(hash_tree)
     }
 
-    fn clear_current_directory(ignore_options: &[String]) {
-        for entry in fs::read_dir(".").unwrap() {
-            let path = entry.unwrap().path();
+    fn clear_current_directory(ignore_options: &[String]) -> Result<()> {
+        for entry in fs::read_dir(".")? {
+            let path = entry?.path();
             if Tree::is_ignored(path.to_str().unwrap(), ignore_options) {
                 continue;
             }
-            let metadata = fs::symlink_metadata(&path).unwrap();
+            let metadata = fs::symlink_metadata(&path)?;
 
             if metadata.is_file() {
-                fs::remove_file(&path).unwrap();
+                fs::remove_file(&path)?;
             }
             if metadata.is_dir() {
-                fs::remove_dir_all(&path).unwrap();
+                fs::remove_dir_all(&path)?;
             }
         }
+        Ok(())
     }
 
-    pub fn read_tree(oid: &str, ignore_options: &[String]) {
-        Tree::clear_current_directory(ignore_options);
-        let tree_contents = get_object(oid, TypeObject::Tree).unwrap();
-        let tree = &Tree::get_tree(&tree_contents).unwrap();
+    pub fn read_tree(oid: &str, ignore_options: &[String]) -> Result<()> {
+        Tree::clear_current_directory(ignore_options)?;
+        let tree_contents = get_object(oid, TypeObject::Tree)?;
+        let tree = &Tree::get_tree(&tree_contents)?;
 
         for entry in tree.entries.iter() {
             let path = Path::new(&entry.path);
             let prefix = path.parent().unwrap();
             if !prefix.exists() {
-                fs::create_dir_all(prefix).unwrap();
+                fs::create_dir_all(prefix)?;
             }
             let mut file = fs::OpenOptions::new()
                 .write(true)
                 .create(true)
                 .truncate(true)
                 .open(&entry.path)
-                .with_context(|| format!("Failed to access file: {}", &entry.path))
-                .unwrap();
+                .with_context(|| format!("Failed to access file: {}", &entry.path))?;
 
-            file.write_all(get_object(&entry.oid, TypeObject::Blob).unwrap().as_bytes())
-                .unwrap();
+            file.write_all(get_object(&entry.oid, TypeObject::Blob)?.as_bytes())?;
         }
+        Ok(())
     }
 
     pub fn get_tree(tree: &str) -> Result<Self> {
