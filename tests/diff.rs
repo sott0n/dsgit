@@ -19,7 +19,7 @@ fn test_diff_trees() {
     fs::write("./tiger.txt", "ToraTora").unwrap();
     let to_tree = Tree::new(".", &[]).unwrap();
 
-    let mut diffs = diff_trees(from_tree, to_tree).unwrap();
+    let mut diffs = diff_trees(from_tree, to_tree, false).unwrap();
     diffs.1.sort();
 
     if cfg!(target_os = "windows") {
@@ -42,7 +42,7 @@ fn test_diff_trees() {
     f.write_all(b"gaoo").unwrap();
     f.flush().unwrap();
     let to_tree = Tree::new(".", &[]).unwrap();
-    let diffs = diff_trees(from_tree, to_tree).unwrap();
+    let diffs = diff_trees(from_tree, to_tree, false).unwrap();
 
     if cfg!(target_os = "windows") {
         assert_eq!(diffs.0, vec![".\\tiger.txt"]);

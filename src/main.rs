@@ -4,6 +4,7 @@ pub mod diff;
 pub mod entry;
 pub mod reference;
 
+use colored::*;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -191,10 +192,7 @@ fn log(tag_or_oid: Option<String>) {
 
     let mut oid = match tag_or_oid {
         Some(tag_or_oid) => data::get_oid(&tag_or_oid).unwrap(),
-        None => match reference::RefValue::get_ref("HEAD", true).unwrap() {
-            Some(ref_value) => ref_value.value,
-            None => return,
-        },
+        None => reference::get_head_oid(),
     };
 
     loop {
@@ -213,10 +211,7 @@ fn log(tag_or_oid: Option<String>) {
 fn show(oid: Option<String>) {
     let oid = match oid {
         Some(oid) => oid,
-        None => match RefValue::get_ref("HEAD", true).unwrap() {
-            Some(ref_value) => ref_value.value,
-            None => return,
-        },
+        None => reference::get_head_oid(),
     };
 
     let commit = Commit::get_commit(&oid).unwrap();
@@ -229,6 +224,7 @@ fn show(oid: Option<String>) {
         diff::diff_trees(
             Tree::get_tree(&from_tree).unwrap(),
             Tree::get_tree(&to_tree).unwrap(),
+            true,
         )
         .unwrap();
     };
@@ -238,10 +234,7 @@ fn diff(oid: Option<String>) {
     let ignore_files = read_ignore_file();
     let oid = match oid {
         Some(oid) => oid,
-        None => match RefValue::get_ref("HEAD", true).unwrap() {
-            Some(ref_value) => ref_value.value,
-            None => return,
-        },
+        None => reference::get_head_oid(),
     };
     let pre_commit = Commit::get_commit(&oid).unwrap();
     let pre_tree = data::get_object(&pre_commit.tree, TypeObject::Tree).unwrap();
@@ -250,6 +243,7 @@ fn diff(oid: Option<String>) {
     diff::diff_trees(
         Tree::get_tree(&pre_tree).unwrap(),
         Tree::get_working_tree(&ignore_files).unwrap(),
+        true,
     )
     .unwrap();
 }
@@ -324,10 +318,51 @@ fn branch(pair_name_oid: Option<(&str, &str)>) {
 }
 
 fn status() {
-    let oid = data::get_oid("HEAD").unwrap();
+    let oid = reference::get_head_oid();
     match RefValue::get_branch_name().unwrap() {
         Some(branch) => println!("On branch {}", branch),
         None => println!("HEAD detached at {}", &oid[10..]),
+    }
+
+    let ignore_files = read_ignore_file();
+    let diffs = diff::diff_trees(
+        Tree::get_head_tree().unwrap(),
+        Tree::get_working_tree(&ignore_files).unwrap(),
+        false,
+    )
+    .unwrap();
+
+    if diffs.0.is_empty() && diffs.1.is_empty() && diffs.2.is_empty() {
+        println!("\nCurrent status is clean.");
+        exit(0);
+    }
+    println!("\nChanged to be commited:");
+    for m in diffs.0.iter() {
+        println!(
+            "{:ident$}{}:   {:#}",
+            "",
+            "modified".green(),
+            &m.green(),
+            ident = 7
+        );
+    }
+    for c in diffs.1.iter() {
+        println!(
+            "{:ident$}{} :   {:#}",
+            "",
+            "created".green(),
+            &c.green(),
+            ident = 7
+        );
+    }
+    for r in diffs.2.iter() {
+        println!(
+            "{:ident$}{} :   {:#}",
+            "",
+            "removed".red(),
+            &r.red(),
+            ident = 7
+        );
     }
 }
 

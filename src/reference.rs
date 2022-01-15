@@ -166,3 +166,10 @@ pub fn reset(commit: &str) {
     let ref_value = RefValue::new(Some(commit), false, commit);
     RefValue::update_ref("HEAD", &ref_value, true).unwrap();
 }
+
+pub fn get_head_oid() -> String {
+    match RefValue::get_ref("HEAD", true).unwrap() {
+        Some(ref_value) => ref_value.value,
+        None => panic!("HEAD reference is missing"),
+    }
+}

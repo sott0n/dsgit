@@ -16,7 +16,11 @@ fn convert_dict(tree: Tree) -> HashMap<String, String> {
     tree_dict
 }
 
-pub fn diff_trees(from: Tree, to: Tree) -> Result<(Vec<String>, Vec<String>, Vec<String>)> {
+pub fn diff_trees(
+    from: Tree,
+    to: Tree,
+    display: bool,
+) -> Result<(Vec<String>, Vec<String>, Vec<String>)> {
     let from_tree = convert_dict(from);
     let to_tree = convert_dict(to);
 
@@ -34,21 +38,27 @@ pub fn diff_trees(from: Tree, to: Tree) -> Result<(Vec<String>, Vec<String>, Vec
             Some(from_oid) => match &to_tree.get(path) {
                 Some(to_oid) => {
                     if from_oid != to_oid {
-                        println!("Changed: {}", path);
-                        display_diff_file(Some(from_oid), Some(to_oid))?;
+                        if display {
+                            println!("Modified: {}", path);
+                            display_diff_file(Some(from_oid), Some(to_oid))?;
+                        }
                         changed_entries.push(path.to_owned());
                     }
                 }
                 None => {
-                    println!("Removed: {}", path);
-                    display_diff_file(Some(from_oid), None)?;
+                    if display {
+                        println!("Removed: {}", path);
+                        display_diff_file(Some(from_oid), None)?;
+                    }
                     removed_entries.push(path.to_owned());
                 }
             },
             None => match &to_tree.get(path) {
                 Some(to_oid) => {
-                    println!("Created: {}", path);
-                    display_diff_file(None, Some(to_oid))?;
+                    if display {
+                        println!("Created: {}", path);
+                        display_diff_file(None, Some(to_oid))?;
+                    }
                     created_entries.push(path.to_owned());
                 }
                 None => continue,

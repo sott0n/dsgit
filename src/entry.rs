@@ -1,10 +1,13 @@
-use crate::data::{get_object, hash_object, TypeObject};
 use anyhow::{anyhow, Context, Result};
 use std::fmt;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
+
+use crate::commit::Commit;
+use crate::data::{get_object, hash_object, TypeObject};
+use crate::reference::get_head_oid;
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Entry {
@@ -174,6 +177,13 @@ impl Tree {
 
     pub fn get_working_tree(ignore_options: &[String]) -> Result<Tree> {
         Tree::new(".", ignore_options)
+    }
+
+    pub fn get_head_tree() -> Result<Tree> {
+        let oid = get_head_oid();
+        let head_commit = Commit::get_commit(&oid)?;
+        let head_tree = get_object(&head_commit.tree, TypeObject::Tree)?;
+        Tree::get_tree(&head_tree)
     }
 
     fn is_ignored(path: &str, ignore_options: &[String]) -> bool {
